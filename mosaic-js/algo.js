@@ -918,6 +918,122 @@ function drawPixel(ctx, x, y, radius, pixelHex, strokeHex, pixelType) {
     }
 }
 
+// Fast path: batches all same-color pixels into a single path+fill call.
+// For 288x288 this reduces ~250K draw calls to ~60 fill() + ~60 stroke() calls.
+function drawStudImageFast(pixels, width, height, scalingFactor, canvas, pixelType, plateDimensionsOverlay) {
+    const canvasW = width * scalingFactor;
+    const canvasH = height * scalingFactor;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext("2d");
+    const totalPixels = width * height;
+    const cellSize = scalingFactor;
+    const isRound = [PIXEL_TYPE_OPTIONS[0].number, PIXEL_TYPE_OPTIONS[1].number].includes(pixelType);
+    const isVariable = ("" + pixelType).match("^variable.*$");
+    const inset = Math.max(1, Math.round(cellSize * 0.04));
+    const innerSize = cellSize - inset;
+    const halfInset = Math.floor(inset / 2);
+
+    // Black background (acts as grid lines between studs)
+    ctx.fillStyle = "#111111";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Group pixels by color
+    const pixelsByColor = new Map();
+    for (let i = 0; i < totalPixels; i++) {
+        const key = (pixels[i * 4] << 16) | (pixels[i * 4 + 1] << 8) | pixels[i * 4 + 2];
+        if (!pixelsByColor.has(key)) {
+            pixelsByColor.set(key, { hex: rgbToHex(pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]), indices: [] });
+        }
+        pixelsByColor.get(key).indices.push(i);
+    }
+
+    // Draw all pixels of each color in a single batched path
+    if (isRound) {
+        const r = innerSize / 2;
+        for (const { hex, indices } of pixelsByColor.values()) {
+            ctx.fillStyle = hex;
+            ctx.beginPath();
+            for (const i of indices) {
+                const cx = (i % width) * cellSize + cellSize / 2;
+                const cy = Math.floor(i / width) * cellSize + cellSize / 2;
+                ctx.moveTo(cx + r, cy);
+                ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            }
+            ctx.fill();
+        }
+    } else {
+        // Square studs: use fillRect per pixel but batched by color (fewer fillStyle changes)
+        for (const { hex, indices } of pixelsByColor.values()) {
+            ctx.fillStyle = hex;
+            for (const i of indices) {
+                ctx.fillRect(
+                    (i % width) * cellSize + halfInset,
+                    Math.floor(i / width) * cellSize + halfInset,
+                    innerSize, innerSize
+                );
+            }
+        }
+        // Grid outline for non-variable types
+        if (!isVariable) {
+            ctx.strokeStyle = "#111111";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= width; x++) {
+                ctx.moveTo(x * cellSize, 0);
+                ctx.lineTo(x * cellSize, canvasH);
+            }
+            for (let y = 0; y <= height; y++) {
+                ctx.moveTo(0, y * cellSize);
+                ctx.lineTo(canvasW, y * cellSize);
+            }
+            ctx.stroke();
+        }
+    }
+
+    // Stud inner circles (batched into one single path)
+    const needsStudCircle = [
+        PIXEL_TYPE_OPTIONS[1].number,
+        PIXEL_TYPE_OPTIONS[3].number,
+        PIXEL_TYPE_OPTIONS[4].number,
+        PIXEL_TYPE_OPTIONS[6].number,
+        PIXEL_TYPE_OPTIONS[7].number,
+    ].includes(pixelType);
+
+    if (needsStudCircle) {
+        const studR = cellSize * 0.3;
+        ctx.strokeStyle = "#111111";
+        ctx.lineWidth = Math.max(1, Math.round(cellSize * 0.06));
+        ctx.beginPath();
+        for (let i = 0; i < totalPixels; i++) {
+            const cx = (i % width) * cellSize + cellSize / 2;
+            const cy = Math.floor(i / width) * cellSize + cellSize / 2;
+            ctx.moveTo(cx + studR, cy);
+            ctx.arc(cx, cy, studR, 0, 2 * Math.PI);
+        }
+        ctx.stroke();
+    }
+
+    // Variable pixel plate overlay
+    if (isVariable && plateDimensionsOverlay) {
+        ctx.strokeStyle = "#888888";
+        ctx.lineWidth = Math.max(2, Math.round(cellSize * 0.15));
+        ctx.beginPath();
+        for (let row = 0; row < plateDimensionsOverlay.length; row++) {
+            for (let col = 0; col < plateDimensionsOverlay[0].length; col++) {
+                const part = plateDimensionsOverlay[row][col];
+                if (part != null) {
+                    ctx.rect(col * cellSize, row * cellSize, cellSize * part[1], cellSize * part[0]);
+                }
+            }
+        }
+        ctx.stroke();
+    }
+}
+
+// Threshold: use fast path when total pixels exceed this count
+const FAST_DRAW_THRESHOLD = 4096;
+
 // replaces square pixels with correct shape and upscales
 function drawStudImageOnCanvas(
     pixels,
@@ -927,15 +1043,22 @@ function drawStudImageOnCanvas(
     pixelType,
     plateDimensionsOverlay // only used if pixelType contains 'variable'
 ) {
+    const totalPixels = pixels.length / 4;
+    const height = totalPixels / width;
+
+    // Use fast ImageData-based rendering for large mosaics
+    if (totalPixels > FAST_DRAW_THRESHOLD) {
+        return drawStudImageFast(pixels, width, height, scalingFactor, canvas, pixelType, plateDimensionsOverlay);
+    }
+
     const ctx = canvas.getContext("2d");
 
     canvas.width = width * scalingFactor;
-    canvas.height = ((pixels.length / 4) * scalingFactor) / width;
-    ctx.fillRect(0, 0, width * scalingFactor, ((pixels.length / 4) * scalingFactor) / width);
+    canvas.height = height * scalingFactor;
+    ctx.fillRect(0, 0, width * scalingFactor, height * scalingFactor);
 
     const radius = scalingFactor / 2;
-    const totalPixels = pixels.length / 4;
-    
+
     // Group pixels by color for batch rendering (optimization)
     const pixelsByColor = new Map();
     for (let i = 0; i < totalPixels; i++) {
@@ -945,16 +1068,16 @@ function drawStudImageOnCanvas(
         }
         pixelsByColor.get(pixelHex).push(i);
     }
-    
+
     // Draw pixels grouped by color (reduces context switches)
     for (const [pixelHex, indices] of pixelsByColor) {
         ctx.fillStyle = pixelHex;
         ctx.strokeStyle = "#111111";
-        
+
         for (const i of indices) {
             const x = (i % width) * 2 * radius;
             const y = Math.floor(i / width) * 2 * radius;
-            
+
             ctx.beginPath();
             if ([PIXEL_TYPE_OPTIONS[0].number, PIXEL_TYPE_OPTIONS[1].number].includes(pixelType)) {
                 ctx.arc(x + radius, y + radius, radius, 0, 2 * Math.PI);
@@ -965,7 +1088,7 @@ function drawStudImageOnCanvas(
             if (!("" + pixelType).match("^variable.*$")) {
                 ctx.stroke();
             }
-            
+
             // Draw stud circle if needed
             if (
                 [

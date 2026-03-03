@@ -693,7 +693,7 @@
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.4);
+        background-color: rgba(0, 0, 0, 0.45);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -701,6 +701,13 @@
       }
 
       #loading-overlay.hidden { display: none; }
+
+      .loading-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
 
       .spinner {
         width: 52px; height: 52px;
@@ -711,6 +718,16 @@
       }
 
       @keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+      .loading-status {
+        color: #fff;
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        text-align: center;
+        max-width: 280px;
+        line-height: 1.4;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      }
 
       /* ---- Advanced Settings Toggle ---- */
       .mosaic-advanced-section {
@@ -821,7 +838,12 @@
 
   <body>
     <!-- Loading overlay -->
-    <div id="loading-overlay" class="hidden"><div class="spinner"></div></div>
+    <div id="loading-overlay" class="hidden">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <div id="loading-status-text" class="loading-status"></div>
+      </div>
+    </div>
 
     <div class="mosaic-page">
       <!-- Hidden utility elements -->

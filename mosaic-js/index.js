@@ -59,6 +59,21 @@ const interactionSelectors = [
 
 const customStudTableBody = document.getElementById("custom-stud-table-body");
 
+function showLoadingStatus(message) {
+    const el = document.getElementById("loading-status-text");
+    if (el) el.textContent = message || "";
+}
+
+// Ensures the loading overlay is visible (painted) before running heavy synchronous work.
+// Uses double-requestAnimationFrame to guarantee the browser has completed a paint cycle.
+function runAfterOverlayPaint(callback) {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            callback();
+        });
+    });
+}
+
 function disableInteraction() {
     interactionSelectors.forEach((button) => (button.disabled = true));
     [...document.getElementsByTagName("input")].forEach((button) => (button.disabled = true));
@@ -68,8 +83,6 @@ function disableInteraction() {
     document.getElementById("universal-loading-progress-complement").hidden = true;
     const overlay = document.getElementById("loading-overlay");
     overlay.classList.remove("hidden");
-    // Force browser to repaint immediately so spinner is visible before heavy processing
-    overlay.offsetHeight;
     if (inputImageCropper != null) {
         inputImageCropper.disable();
     }
@@ -86,6 +99,7 @@ function enableInteraction() {
     );
     document.getElementById("universal-loading-progress").hidden = true;
     document.getElementById("universal-loading-progress-complement").hidden = false;
+    showLoadingStatus("");
     document.getElementById("loading-overlay").classList.add("hidden");
     if (inputImageCropper != null) {
         inputImageCropper.enable();
@@ -1267,124 +1281,129 @@ const debouncedRunStep2 = debounce(() => {
 function runStep2() {
     updateScalingFactor();
     disableInteraction();
+    showLoadingStatus(t('loadingProcessing'));
     invalidateStepsFrom(3);
-    let inputPixelArray;
-    if (selectedInterpolationAlgorithm === "default") {
-        const croppedCanvas = inputImageCropper.getCroppedCanvas({
-            width: targetResolution[0],
-            height: targetResolution[1],
-            maxWidth: 4096,
-            maxHeight: 4096,
-            imageSmoothingEnabled: false,
-        });
-        inputPixelArray = getPixelArrayFromCanvas(croppedCanvas);
-    } else {
-        // We're using adaptive pooling
-        const croppedCanvas = inputImageCropper.getCroppedCanvas({
-            maxWidth: 4096,
-            maxHeight: 4096,
-            imageSmoothingEnabled: false,
-        });
-        rawCroppedData = getPixelArrayFromCanvas(croppedCanvas);
-        let subArrayPoolingFunction;
-        if (selectedInterpolationAlgorithm === "maxPooling") {
-            subArrayPoolingFunction = maxPoolingKernel;
-        } else if (selectedInterpolationAlgorithm === "minPooling") {
-            subArrayPoolingFunction = minPoolingKernel;
-        } else if (selectedInterpolationAlgorithm === "avgPooling") {
-            subArrayPoolingFunction = avgPoolingKernel;
+
+    runAfterOverlayPaint(() => {
+        let inputPixelArray;
+        if (selectedInterpolationAlgorithm === "default") {
+            const croppedCanvas = inputImageCropper.getCroppedCanvas({
+                width: targetResolution[0],
+                height: targetResolution[1],
+                maxWidth: 4096,
+                maxHeight: 4096,
+                imageSmoothingEnabled: false,
+            });
+            inputPixelArray = getPixelArrayFromCanvas(croppedCanvas);
         } else {
-            //  selectedInterpolationAlgorithm === "dualMinMaxPooling"
-            subArrayPoolingFunction = dualMinMaxPoolingKernel;
+            // We're using adaptive pooling
+            const croppedCanvas = inputImageCropper.getCroppedCanvas({
+                maxWidth: 4096,
+                maxHeight: 4096,
+                imageSmoothingEnabled: false,
+            });
+            rawCroppedData = getPixelArrayFromCanvas(croppedCanvas);
+            let subArrayPoolingFunction;
+            if (selectedInterpolationAlgorithm === "maxPooling") {
+                subArrayPoolingFunction = maxPoolingKernel;
+            } else if (selectedInterpolationAlgorithm === "minPooling") {
+                subArrayPoolingFunction = minPoolingKernel;
+            } else if (selectedInterpolationAlgorithm === "avgPooling") {
+                subArrayPoolingFunction = avgPoolingKernel;
+            } else {
+                //  selectedInterpolationAlgorithm === "dualMinMaxPooling"
+                subArrayPoolingFunction = dualMinMaxPoolingKernel;
+            }
+            inputPixelArray = resizeImagePixelsWithAdaptivePooling(
+                rawCroppedData,
+                croppedCanvas.width,
+                targetResolution[0],
+                targetResolution[1],
+                subArrayPoolingFunction
+            );
         }
-        inputPixelArray = resizeImagePixelsWithAdaptivePooling(
-            rawCroppedData,
-            croppedCanvas.width,
-            targetResolution[0],
-            targetResolution[1],
-            subArrayPoolingFunction
+        let filteredPixelArray = applyHSVAdjustment(
+            inputPixelArray,
+            document.getElementById("hue-slider").value,
+            document.getElementById("saturation-slider").value / 100,
+            document.getElementById("value-slider").value / 100
         );
-    }
-    let filteredPixelArray = applyHSVAdjustment(
-        inputPixelArray,
-        document.getElementById("hue-slider").value,
-        document.getElementById("saturation-slider").value / 100,
-        document.getElementById("value-slider").value / 100
-    );
-    filteredPixelArray = applyBrightnessAdjustment(
-        filteredPixelArray,
-        Number(document.getElementById("brightness-slider").value)
-    );
-    filteredPixelArray = applyContrastAdjustment(
-        filteredPixelArray,
-        Number(document.getElementById("contrast-slider").value)
-    );
-    step2Canvas.width = targetResolution[0];
-    step2Canvas.height = targetResolution[1];
-    drawPixelsOnCanvas(filteredPixelArray, step2Canvas);
+        filteredPixelArray = applyBrightnessAdjustment(
+            filteredPixelArray,
+            Number(document.getElementById("brightness-slider").value)
+        );
+        filteredPixelArray = applyContrastAdjustment(
+            filteredPixelArray,
+            Number(document.getElementById("contrast-slider").value)
+        );
+        step2Canvas.width = targetResolution[0];
+        step2Canvas.height = targetResolution[1];
+        drawPixelsOnCanvas(filteredPixelArray, step2Canvas);
 
-    step2DepthCanvas.width = targetResolution[0];
-    step2DepthCanvas.height = targetResolution[1];
+        step2DepthCanvas.width = targetResolution[0];
+        step2DepthCanvas.height = targetResolution[1];
 
-    // Map the crop to the depth image
-    const cropperData = inputImageCropper.getData();
-    const rawCroppedDepthImage = step1DepthCanvasUpscaledContext.getImageData(
-        cropperData.x,
-        cropperData.y,
-        cropperData.width,
-        cropperData.height
-    );
-    const cropperBufferCanvas = document.getElementById("step-2-depth-canvas-cropper-buffer");
-    const cropperBufferCanvasContext = cropperBufferCanvas.getContext("2d");
-    cropperBufferCanvas.width = targetResolution[0];
-    cropperBufferCanvas.height = targetResolution[1];
-    cropperBufferCanvasContext.drawImage(
-        step1DepthCanvasUpscaled,
-        cropperData.x,
-        cropperData.y,
-        cropperData.width,
-        cropperData.height,
-        0,
-        0,
-        targetResolution[0],
-        targetResolution[1]
-    );
-    const inputDepthPixelArray = getPixelArrayFromCanvas(cropperBufferCanvas);
-
-    const discreteDepthPixels = getDiscreteDepthPixels(
-        inputDepthPixelArray,
-        [...document.getElementById("depth-threshold-sliders-containers").children].map((slider) =>
-            Number(slider.value)
-        )
-    );
-    drawPixelsOnCanvas(discreteDepthPixels, step2DepthCanvas);
-
-    setTimeout(() => {
-        stepProcessed[2] = true;
-        enableInteraction();
-        step2CanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
-        step2CanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
-        step2CanvasUpscaledContext.imageSmoothingEnabled = false;
-        step2CanvasUpscaledContext.drawImage(
-            step2Canvas,
+        // Map the crop to the depth image
+        const cropperData = inputImageCropper.getData();
+        const rawCroppedDepthImage = step1DepthCanvasUpscaledContext.getImageData(
+            cropperData.x,
+            cropperData.y,
+            cropperData.width,
+            cropperData.height
+        );
+        const cropperBufferCanvas = document.getElementById("step-2-depth-canvas-cropper-buffer");
+        const cropperBufferCanvasContext = cropperBufferCanvas.getContext("2d");
+        cropperBufferCanvas.width = targetResolution[0];
+        cropperBufferCanvas.height = targetResolution[1];
+        cropperBufferCanvasContext.drawImage(
+            step1DepthCanvasUpscaled,
+            cropperData.x,
+            cropperData.y,
+            cropperData.width,
+            cropperData.height,
             0,
             0,
-            targetResolution[0] * SCALING_FACTOR,
-            targetResolution[1] * SCALING_FACTOR
-        );
-        step2DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
-        step2DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
-        drawStudImageOnCanvas(
-            scaleUpDiscreteDepthPixelsForDisplay(
-                discreteDepthPixels,
-                document.getElementById("num-depth-levels-slider").value
-            ),
             targetResolution[0],
-            SCALING_FACTOR,
-            step2DepthCanvasUpscaled,
-            selectedPixelPartNumber
+            targetResolution[1]
         );
-    }, 1);
+        const inputDepthPixelArray = getPixelArrayFromCanvas(cropperBufferCanvas);
+
+        const discreteDepthPixels = getDiscreteDepthPixels(
+            inputDepthPixelArray,
+            [...document.getElementById("depth-threshold-sliders-containers").children].map((slider) =>
+                Number(slider.value)
+            )
+        );
+        drawPixelsOnCanvas(discreteDepthPixels, step2DepthCanvas);
+
+        showLoadingStatus(t('loadingRendering'));
+        setTimeout(() => {
+            step2CanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
+            step2CanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
+            step2CanvasUpscaledContext.imageSmoothingEnabled = false;
+            step2CanvasUpscaledContext.drawImage(
+                step2Canvas,
+                0,
+                0,
+                targetResolution[0] * SCALING_FACTOR,
+                targetResolution[1] * SCALING_FACTOR
+            );
+            step2DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
+            step2DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
+            drawStudImageOnCanvas(
+                scaleUpDiscreteDepthPixelsForDisplay(
+                    discreteDepthPixels,
+                    document.getElementById("num-depth-levels-slider").value
+                ),
+                targetResolution[0],
+                SCALING_FACTOR,
+                step2DepthCanvasUpscaled,
+                selectedPixelPartNumber
+            );
+            stepProcessed[2] = true;
+            enableInteraction();
+        }, 1);
+    });
 }
 
 function runStep2Only() {
@@ -1418,138 +1437,143 @@ let step3VariablePixelPieceDimensions = null;
 
 function runStep3() {
     disableInteraction();
+    showLoadingStatus(t('loadingQuantizing'));
     invalidateStepsFrom(4);
-    const fiteredPixelArray = getPixelArrayFromCanvas(step2Canvas);
 
-    let alignedPixelArray;
+    runAfterOverlayPaint(() => {
+        const fiteredPixelArray = getPixelArrayFromCanvas(step2Canvas);
 
-    // TODO: Apply overrides separately
-    if (quantizationAlgorithm === "twoPhase") {
-        alignedPixelArray = alignPixelsToStudMap(
-            fiteredPixelArray,
-            isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
-            colorDistanceFunction
-        );
-    } else if (quantizationAlgorithm === "greedy" || quantizationAlgorithm === "greedyWithDithering") {
-        alignedPixelArray = correctPixelsForAvailableStudsWithGreedyDynamicDithering(
-            isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
-            fiteredPixelArray,
-            targetResolution[0],
-            colorDistanceFunction,
-            quantizationAlgorithm !== "greedyWithDithering", // skipDithering
-            true // assumeInfinitePixelCounts
-        );
-    } else {
-        // assume we're dealing with a traditional error dithering algorithm
-        const ditheringKernel = quantizationAlgorithmToTraditionalDitheringKernel[quantizationAlgorithm];
-        alignedPixelArray = alignPixelsWithTraditionalDithering(
-            isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
-            fiteredPixelArray,
-            targetResolution[0],
-            colorDistanceFunction,
-            ditheringKernel
-        );
-    }
+        let alignedPixelArray;
 
-    step3PixelArrayForEraser = alignedPixelArray;
-    alignedPixelArray = getArrayWithOverridesApplied(
-        alignedPixelArray,
-        isBleedthroughEnabled() ? getDarkenedImage(overridePixelArray) : overridePixelArray
-    );
-
-    step3DepthCanvas.width = targetResolution[0];
-    step3DepthCanvas.height = targetResolution[1];
-    const inputDepthPixelArray = getPixelArrayFromCanvas(step2DepthCanvas);
-
-    const adjustedDepthPixelArray = getArrayWithOverridesApplied(inputDepthPixelArray, overrideDepthPixelArray);
-
-    drawPixelsOnCanvas(adjustedDepthPixelArray, step3DepthCanvas);
-
-    if (("" + selectedPixelPartNumber).match("^variable.*$")) {
-        const alignedPixelMatrix = convertPixelArrayToMatrix(alignedPixelArray, targetResolution[0]);
-        step3VariablePixelPieceDimensions = new Array();
-        for (let i = 0; i < targetResolution[1]; i++) {
-            step3VariablePixelPieceDimensions.push([]);
-            step3VariablePixelPieceDimensions[i] = [];
-            for (let j = 0; j < targetResolution[0]; j++) {
-                step3VariablePixelPieceDimensions[i].push(null);
-            }
+        // TODO: Apply overrides separately
+        if (quantizationAlgorithm === "twoPhase") {
+            alignedPixelArray = alignPixelsToStudMap(
+                fiteredPixelArray,
+                isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
+                colorDistanceFunction
+            );
+        } else if (quantizationAlgorithm === "greedy" || quantizationAlgorithm === "greedyWithDithering") {
+            alignedPixelArray = correctPixelsForAvailableStudsWithGreedyDynamicDithering(
+                isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
+                fiteredPixelArray,
+                targetResolution[0],
+                colorDistanceFunction,
+                quantizationAlgorithm !== "greedyWithDithering", // skipDithering
+                true // assumeInfinitePixelCounts
+            );
+        } else {
+            // assume we're dealing with a traditional error dithering algorithm
+            const ditheringKernel = quantizationAlgorithmToTraditionalDitheringKernel[quantizationAlgorithm];
+            alignedPixelArray = alignPixelsWithTraditionalDithering(
+                isBleedthroughEnabled() ? getDarkenedStudMap(selectedStudMap) : selectedStudMap,
+                fiteredPixelArray,
+                targetResolution[0],
+                colorDistanceFunction,
+                ditheringKernel
+            );
         }
-        const uniqueColors = Object.keys(getUsedPixelsStudMap(alignedPixelArray));
-        const availableParts = getVariablePixelAvailablePartDimensions();
-        for (
-            let depthLevel = 0;
-            depthLevel < Number(document.getElementById("num-depth-levels-slider").value);
-            depthLevel++
-        ) {
-            uniqueColors.forEach((colorHex) => {
-                const colorRGB = hexToRgb(colorHex);
-                const setPixelMatrix = getSetPixelMatrixFromInputMatrix(alignedPixelMatrix, (p, i, j) => {
-                    return !(
-                        (!depthEnabled || depthLevel === adjustedDepthPixelArray[4 * (i * targetResolution[0] + j)]) &&
-                        p[0] === colorRGB[0] &&
-                        p[1] === colorRGB[1] &&
-                        p[2] === colorRGB[2]
+
+        step3PixelArrayForEraser = alignedPixelArray;
+        alignedPixelArray = getArrayWithOverridesApplied(
+            alignedPixelArray,
+            isBleedthroughEnabled() ? getDarkenedImage(overridePixelArray) : overridePixelArray
+        );
+
+        step3DepthCanvas.width = targetResolution[0];
+        step3DepthCanvas.height = targetResolution[1];
+        const inputDepthPixelArray = getPixelArrayFromCanvas(step2DepthCanvas);
+
+        const adjustedDepthPixelArray = getArrayWithOverridesApplied(inputDepthPixelArray, overrideDepthPixelArray);
+
+        drawPixelsOnCanvas(adjustedDepthPixelArray, step3DepthCanvas);
+
+        if (("" + selectedPixelPartNumber).match("^variable.*$")) {
+            const alignedPixelMatrix = convertPixelArrayToMatrix(alignedPixelArray, targetResolution[0]);
+            step3VariablePixelPieceDimensions = new Array();
+            for (let i = 0; i < targetResolution[1]; i++) {
+                step3VariablePixelPieceDimensions.push([]);
+                step3VariablePixelPieceDimensions[i] = [];
+                for (let j = 0; j < targetResolution[0]; j++) {
+                    step3VariablePixelPieceDimensions[i].push(null);
+                }
+            }
+            const uniqueColors = Object.keys(getUsedPixelsStudMap(alignedPixelArray));
+            const availableParts = getVariablePixelAvailablePartDimensions();
+            for (
+                let depthLevel = 0;
+                depthLevel < Number(document.getElementById("num-depth-levels-slider").value);
+                depthLevel++
+            ) {
+                uniqueColors.forEach((colorHex) => {
+                    const colorRGB = hexToRgb(colorHex);
+                    const setPixelMatrix = getSetPixelMatrixFromInputMatrix(alignedPixelMatrix, (p, i, j) => {
+                        return !(
+                            (!depthEnabled || depthLevel === adjustedDepthPixelArray[4 * (i * targetResolution[0] + j)]) &&
+                            p[0] === colorRGB[0] &&
+                            p[1] === colorRGB[1] &&
+                            p[2] === colorRGB[2]
+                        );
+                    });
+                    const requiredPartMatrix = getRequiredPartMatrixFromSetPixelMatrix(
+                        setPixelMatrix,
+                        availableParts,
+                        PLATE_WIDTH
                     );
-                });
-                const requiredPartMatrix = getRequiredPartMatrixFromSetPixelMatrix(
-                    setPixelMatrix,
-                    availableParts,
-                    PLATE_WIDTH
-                );
-                requiredPartMatrix.forEach((row, i) => {
-                    row.forEach((entry, j) => {
-                        step3VariablePixelPieceDimensions[i][j] = step3VariablePixelPieceDimensions[i][j] || entry;
+                    requiredPartMatrix.forEach((row, i) => {
+                        row.forEach((entry, j) => {
+                            step3VariablePixelPieceDimensions[i][j] = step3VariablePixelPieceDimensions[i][j] || entry;
+                        });
                     });
                 });
-            });
+            }
+        } else {
+            step3VariablePixelPieceDimensions = null;
         }
-    } else {
-        step3VariablePixelPieceDimensions = null;
-    }
 
-    step3Canvas.width = targetResolution[0];
-    step3Canvas.height = targetResolution[1];
-    drawPixelsOnCanvas(alignedPixelArray, step3Canvas);
+        step3Canvas.width = targetResolution[0];
+        step3Canvas.height = targetResolution[1];
+        drawPixelsOnCanvas(alignedPixelArray, step3Canvas);
 
-    step3CanvasPixelsForHover = isBleedthroughEnabled()
-        ? revertDarkenedImage(
-              alignedPixelArray,
-              getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
-          )
-        : alignedPixelArray;
-    step3DepthCanvasPixelsForHover = adjustedDepthPixelArray;
+        step3CanvasPixelsForHover = isBleedthroughEnabled()
+            ? revertDarkenedImage(
+                  alignedPixelArray,
+                  getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
+              )
+            : alignedPixelArray;
+        step3DepthCanvasPixelsForHover = adjustedDepthPixelArray;
 
-    setTimeout(() => {
-        stepProcessed[3] = true;
-        enableInteraction();
-        step3CanvasUpscaledContext.imageSmoothingEnabled = false;
-        drawStudImageOnCanvas(
-            isBleedthroughEnabled()
-                ? revertDarkenedImage(
-                      alignedPixelArray,
-                      getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
-                  )
-                : alignedPixelArray,
-            targetResolution[0],
-            SCALING_FACTOR,
-            step3CanvasUpscaled,
-            selectedPixelPartNumber,
-            step3VariablePixelPieceDimensions
-        );
-        step3DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
-        step3DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
-        drawStudImageOnCanvas(
-            scaleUpDiscreteDepthPixelsForDisplay(
-                adjustedDepthPixelArray,
-                document.getElementById("num-depth-levels-slider").value
-            ),
-            targetResolution[0],
-            SCALING_FACTOR,
-            step3DepthCanvasUpscaled,
-            selectedPixelPartNumber
-        );
-    }, 1);
+        showLoadingStatus(t('loadingRendering'));
+        setTimeout(() => {
+            step3CanvasUpscaledContext.imageSmoothingEnabled = false;
+            drawStudImageOnCanvas(
+                isBleedthroughEnabled()
+                    ? revertDarkenedImage(
+                          alignedPixelArray,
+                          getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
+                      )
+                    : alignedPixelArray,
+                targetResolution[0],
+                SCALING_FACTOR,
+                step3CanvasUpscaled,
+                selectedPixelPartNumber,
+                step3VariablePixelPieceDimensions
+            );
+            step3DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
+            step3DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
+            drawStudImageOnCanvas(
+                scaleUpDiscreteDepthPixelsForDisplay(
+                    adjustedDepthPixelArray,
+                    document.getElementById("num-depth-levels-slider").value
+                ),
+                targetResolution[0],
+                SCALING_FACTOR,
+                step3DepthCanvasUpscaled,
+                selectedPixelPartNumber
+            );
+            stepProcessed[3] = true;
+            enableInteraction();
+        }, 1);
+    });
 }
 
 function runStep3Only() {
@@ -2107,6 +2131,9 @@ document.getElementById("3d-effect-intensity").addEventListener("change", create
 
 function runStep4(asyncCallback) {
     disableInteraction();
+    showLoadingStatus(t('loadingOptimizing'));
+
+    runAfterOverlayPaint(() => {
     const step2PixelArray = getPixelArrayFromCanvas(step2Canvas);
     const step3PixelArray = getPixelArrayFromCanvas(step3Canvas);
     step4Canvas.width = 0;
@@ -2345,6 +2372,7 @@ function runStep4(asyncCallback) {
     } catch (_e) {
         enableInteraction();
     }
+    }); // end runAfterOverlayPaint
 }
 
 function runStep4Only() {

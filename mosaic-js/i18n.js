@@ -269,6 +269,12 @@ const translations = {
         depthPlatesHelp3: "● Note that larger plates may be difficult to attach/detach from the base",
         availablePlates: "Available Plates:",
         
+        // Loading status messages
+        loadingProcessing: "Processing image\u2026",
+        loadingRendering: "Rendering preview\u2026",
+        loadingQuantizing: "Mapping colors\u2026",
+        loadingOptimizing: "Optimizing piece counts\u2026",
+
         // Language
         language: "Language",
         english: "English",
@@ -543,6 +549,12 @@ const translations = {
         depthPlatesHelp3: "● Beachten Sie, dass größere Platten schwer von der Basis zu befestigen/entfernen sein können",
         availablePlates: "Verfügbare Platten:",
         
+        // Loading status messages
+        loadingProcessing: "Bild wird verarbeitet\u2026",
+        loadingRendering: "Vorschau wird gerendert\u2026",
+        loadingQuantizing: "Farben werden zugeordnet\u2026",
+        loadingOptimizing: "Teileanzahl wird optimiert\u2026",
+
         // Language
         language: "Sprache",
         english: "Englisch",
