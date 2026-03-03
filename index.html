@@ -20,24 +20,10 @@
     />
     <link href="assets/png/icon-192x192.png" rel="icon" type="image/x-icon" />
 
-    <title>Lego mosaic</title>
+    <title>BRICKONAS - Mosaik Konfigurator</title>
 
-    <meta property="og:title" content="Lego mosaic" />
-    <meta property="og:image" content="https://lego-art-remix.com/assets/png/icon-960x960.png" />
-    <meta property="og:description" content="The Intelligent, Easy to Use Lego Mosaic Maker" />
-    <meta name="description" content="The Intelligent, Easy to Use Lego Mosaic Maker" />
-    <meta name="thumbnail" content="https://lego-art-remix.com/assets/png/icon-512x512.png" />
+    <meta name="description" content="BRICKONAS Mosaik Konfigurator" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#FCE4EC" />
-    <link rel="manifest" href="manifest.json" />
-
-    <PageMap>
-      <DataObject type="thumbnail">
-        <Attribute name="src" value="https://lego-art-remix.com/assets/png/icon-512x512.png" />
-        <Attribute name="width" value="512" />
-        <Attribute name="height" value="512" />
-      </DataObject>
-    </PageMap>
 
     <style>
       a {
@@ -567,37 +553,7 @@
                     data-parent="#step-1-depth-accordion"
                   >
                     <div class="card-body accordion-card-body">
-                      <button class="btn btn-success" type="button" id="generate-depth-image" style="margin-top: 8px" data-i18n="computeUsingDNN">
-                        Compute Using DNN
-                      </button>
-                      <br />
-                      <small data-i18n="computeDepthMapHelp">This will compute an approximation of the depth map if you do not have one </small>
-                      <h5 style="margin-top: 4px" id="web-worker-loading-message" hidden></h5>
-                      <div>
-                        <small>
-                          <b style="color: #ff4c00" data-i18n="important">Important</b>
-                          <br />
-                          <p data-i18n="computeDepthMapWarning">
-                            Computing the depth map can be computationally expensive. Be prepared to wait a bit, and be
-                            careful, especially if you have a less powerful device.
-                          </p>
-                          <b data-i18n="howDoesThisWork">How does this work?</b>
-                          <p data-i18n="dnnExplanation">
-                            The depth map is computed using a DNN (deep neural network). For the reasons described in
-                            the 'about' section, everything is run entirely within the browser, using a modified version
-                            of ONNX.js. The model used is MiDaS.
-                          </p>
-                          <div class="card" style="margin-top: 4px; margin-bottom: 16px; padding: 2px">
-                            <b data-i18n="citationForModel">Citation for Model Used</b>
-                            <span>
-                              Ranftl, René, Katrin Lasinger, David Hafner, Konrad Schindler, and Vladlen Koltun.
-                              "Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset
-                              transfer." (2020).
-                              <i>IEEE Transactions on Pattern Analysis and Machine Intelligence</i></span
-                            >
-                          </div>
-                        </small>
-                      </div>
+                      <small data-i18n="selectDepthMapHelp">If you have a depth map corresponding to your image you can select it above.</small>
                     </div>
                   </div>
                 </div>
@@ -1838,26 +1794,6 @@
               </button>
             </div>
           </span>
-          <small hidden
-            ><a
-              target="_blank"
-              id="hogwarts-crest-example-instructions-link"
-              href="assets/pdf/lego-art-remix-discount-hogwarts-crest-instructions.pdf"
-            >
-              Example use case</a
-            >
-            - this is a full Hogwarts crest created by the algorithm with just 1 copy of
-            <a
-              target="_blank"
-              id="31201-lego-website-link"
-              href="https://www.lego.com/en-us/product/harry-potter-hogwarts-crests-31201"
-              >set 31201</a
-            ></small
-          >
-          <span id="run-example-input-container" hidden>
-            <span style="margin-left: 8px; margin-right: 8px; font-weight: 600">Or</span>
-            <button class="btn btn-success" type="button" id="run-example-input" disabled data-i18n="seeAnExample">See an Example</button>
-          </span>
         </div>
       </div>
     </div>
@@ -1866,23 +1802,6 @@
       <div class="row">
         <div class="col-sm">
           <h5>
-            <a data-toggle="collapse" href="#metrics" aria-expanded="false" aria-controls="metrics" data-i18n="usageMetrics"> Usage Metrics </a>
-          </h5>
-          <div class="collapse" id="metrics">
-            <small>
-              <p style="margin-bottom: 4px" data-i18n="metricsNote">
-                Note: No user data is stored, so this is just aggregated info based on simple increments
-              </p>
-            </small>
-            <div>
-              <table id="input-image-count-table">
-                <tr>
-                  <th data-i18n="date">Date</th>
-                  <th data-i18n="imagesCreated">Images created</th>
-                </tr>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1939,21 +1858,6 @@
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", handleDarkModeChange);
     </script>
 
-    <!-- Add firebase to log performance -->
-    <script src="https://www.gstatic.com/firebasejs/7.19.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/7.19.0/firebase-database.js"></script>
-    <script>
-      firebase.initializeApp({
-        apiKey: "AIzaSyDZpG-5SrDxpwV9kmbwNiiKXJhg-qaH1d8",
-        authDomain: "lego-art-remix-stats.firebaseapp.com",
-        databaseURL: "https://lego-art-remix-stats.firebaseio.com",
-        projectId: "lego-art-remix-stats",
-        storageBucket: "lego-art-remix-stats.appspot.com",
-        messagingSenderId: "622482243553",
-        appId: "1:622482243553:web:3ef8ee3f3796190528dca0",
-      });
-    </script>
-
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
     <script
@@ -1991,21 +1895,6 @@
     <script src="js/i18n.js"></script>
     <script src="js/algo.js"></script>
     <script src="js/index.js"></script>
-    <script src="js/metrics.js"></script>
-
-    <script>
-      // note that the disableServiceWorker param only disables new service worker registration
-      if ("serviceWorker" in navigator && !window.location.href.match(/disableServiceWorker/gi)) {
-        navigator.serviceWorker
-          .register("service-worker.js")
-          .then(function (registration) {
-            console.log("Service worker registration successful, scope is:", registration.scope);
-          })
-          .catch(function (error) {
-            console.error("Service worker registration failed, error:", error);
-          });
-      }
-    </script>
 
     <footer>
       <small class="footer">
