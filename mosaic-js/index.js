@@ -151,7 +151,15 @@ let targetResolution = [
 ];
 const PIXEL_WIDTH_CM = 0.8;
 const INCHES_IN_CM = 0.393701;
-const SCALING_FACTOR = 40;
+// Dynamic scaling: cap upscaled canvas at ~5120px per side to avoid
+// memory exhaustion (each 11520×11520 RGBA canvas ≈ 530 MB).
+// At 288×288 this gives factor 17 instead of 40, cutting memory 5×.
+const MAX_UPSCALED_PX = 5120;
+let SCALING_FACTOR = 40;
+function updateScalingFactor() {
+    const maxDim = Math.max(targetResolution[0], targetResolution[1]);
+    SCALING_FACTOR = Math.min(40, Math.max(4, Math.floor(MAX_UPSCALED_PX / maxDim)));
+}
 
 // Plate dimensions in studs - updated dynamically based on step selectors
 let PLATE_WIDTH = 16;  // width step (plate width in studs)
@@ -1257,6 +1265,7 @@ const debouncedRunStep2 = debounce(() => {
 }, DEBOUNCE_DELAY);
 
 function runStep2() {
+    updateScalingFactor();
     disableInteraction();
     invalidateStepsFrom(3);
     let inputPixelArray;
