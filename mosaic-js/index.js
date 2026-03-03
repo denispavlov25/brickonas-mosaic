@@ -1,11 +1,9 @@
 const VERSION_NUMBER = "v2022.12.11";
 
-let perfLoggingDatabase;
-try {
-    perfLoggingDatabase = firebase.database();
-} catch (_e) {
-    // we don't care if this fails
-}
+// Firebase metrics removed — upstream project's database, not ours.
+// perfLoggingDatabase is a no-op stub so existing calls don't throw.
+const noopRef = { transaction() {}, once() { return Promise.resolve({ val: () => null }); } };
+const perfLoggingDatabase = { ref() { return noopRef; } };
 
 function incrementTransaction(count) {
     return (count || 0) + 1;
