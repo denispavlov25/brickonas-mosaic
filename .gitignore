@@ -1,5 +1,4 @@
+node_modules
+app/service-worker.js
+app/workbox-*.js
 .DS_Store
-.env
-.env.*
-node_modules/
-*.log
