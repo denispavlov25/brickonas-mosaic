@@ -591,10 +591,3 @@ STUD_MAPS["pick_a_brick"] = {
     sortedStuds: availablePickABrickStudHexes,
     studMap: pickABricStudkHexToCount,
 };
-
-// Build ordered keys array with dividers for dropdown population
-var STUD_MAP_KEYS = Object.keys(STUD_MAPS);
-var NUM_SET_STUD_MAPS = 12;
-var NUM_PARTIAL_SET_STUD_MAPS = 7;
-STUD_MAP_KEYS.splice(NUM_SET_STUD_MAPS, 0, 'DIVIDER');
-STUD_MAP_KEYS.splice(NUM_SET_STUD_MAPS + NUM_PARTIAL_SET_STUD_MAPS + 1, 0, 'DIVIDER');

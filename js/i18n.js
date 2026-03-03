@@ -2,7 +2,7 @@
 const translations = {
     en: {
         // Page title and header
-        pageTitle: "Lego mosaic",
+        pageTitle: "BRICKONAS Mosaic Configurator",
         
         // Step navigation
         step1Crop: "Step 1: Crop",
@@ -17,7 +17,7 @@ const translations = {
         step4: "Step 4",
         step2Header: "Step 2",
         step3Header: "Step 3",
-        step4Header: "Result",
+        step4Header: "Step 4",
         
         // Step subtitles
         step1DepthSubtitle: "Get depth map",
@@ -26,14 +26,13 @@ const translations = {
         step2DepthSubtitle: "Make depth discrete",
         step3Subtitle: "Align to closest pixel from available colors",
         step3DepthSubtitle: "Adjust Depth Map",
-        step4Subtitle: "Your finished mosaic — download the build instructions as PDF",
+        step4Subtitle: "Correct for available pieces, if piece counts are limited",
         
         // Navigation buttons
         nextAdjust: "Next: Adjust Colors →",
         nextColors: "Next: Colors →",
         nextOutput: "Next: Output →",
         backCrop: "← Back: Crop",
-        backConfigure: "← Back: Configure",
         backAdjust: "← Back: Adjust",
         backColors: "← Back: Colors",
         
@@ -56,27 +55,13 @@ const translations = {
         depthThresholds: "Depth Thresholds",
         numDepthLevels: "Num. Depth Levels",
         
-        // Stepper labels
-        stepperUpload: "Upload Image",
-        stepperCrop: "Crop",
-        stepperConfigure: "Configure",
-        stepperColors: "Colors",
-        stepperResult: "Result",
-
-        // Step headers (redesigned)
-        step1Header: "Crop & Scale",
-        mosaicUploadDesc: "Upload an image here. It will be processed automatically. In the next step you can select the format.",
-        supportedFormatsShort: "Allowed files: JPG, PNG, GIF, WEBP",
-        advancedSettings: "Advanced Settings",
-        step2Hint: "Does the image look good? If you want to adjust colors, brightness or contrast, open the advanced settings.",
-
         // Get Started section
         getStarted: "Get Started",
         uploadImage: "Upload Image",
         pasteImage: "Paste Image",
         exampleImage: "Example Image",
         orPasteImage: "Or, paste an image from your clipboard",
-
+        
         // HSV section
         hsv: "HSV",
         hueAdjustment: "Hue adjustment:",
@@ -269,12 +254,6 @@ const translations = {
         depthPlatesHelp3: "● Note that larger plates may be difficult to attach/detach from the base",
         availablePlates: "Available Plates:",
         
-        // Loading status messages
-        loadingProcessing: "Processing image\u2026",
-        loadingRendering: "Rendering preview\u2026",
-        loadingQuantizing: "Mapping colors\u2026",
-        loadingOptimizing: "Optimizing piece counts\u2026",
-
         // Language
         language: "Language",
         english: "English",
@@ -282,7 +261,7 @@ const translations = {
     },
     de: {
         // Page title and header
-        pageTitle: "Lego Mosaik",
+        pageTitle: "BRICKONAS Mosaik Konfigurator",
         
         // Step navigation
         step1Crop: "Schritt 1: Zuschneiden",
@@ -297,7 +276,7 @@ const translations = {
         step4: "Schritt 4",
         step2Header: "Schritt 2",
         step3Header: "Schritt 3",
-        step4Header: "Ergebnis",
+        step4Header: "Schritt 4",
         
         // Step subtitles
         step1DepthSubtitle: "Tiefenkarte erhalten",
@@ -306,14 +285,13 @@ const translations = {
         step2DepthSubtitle: "Tiefe diskretisieren",
         step3Subtitle: "An nächste Pixelfarbe aus verfügbaren Farben angleichen",
         step3DepthSubtitle: "Tiefenkarte anpassen",
-        step4Subtitle: "Dein fertiges Mosaik – lade die Bauanleitung als PDF herunter",
+        step4Subtitle: "Für verfügbare Teile korrigieren, wenn Teileanzahl begrenzt",
         
         // Navigation buttons
         nextAdjust: "Weiter: Farben anpassen →",
         nextColors: "Weiter: Farben →",
         nextOutput: "Weiter: Ausgabe →",
         backCrop: "← Zurück: Zuschneiden",
-        backConfigure: "← Zurück: Anpassen",
         backAdjust: "← Zurück: Anpassen",
         backColors: "← Zurück: Farben",
         
@@ -336,20 +314,6 @@ const translations = {
         depthThresholds: "Tiefenschwellen",
         numDepthLevels: "Anz. Tiefenstufen",
         
-        // Stepper labels
-        stepperUpload: "Bild hochladen",
-        stepperCrop: "Zuschneiden",
-        stepperConfigure: "Anpassen",
-        stepperColors: "Farben",
-        stepperResult: "Ergebnis",
-
-        // Step headers (redesigned)
-        step1Header: "Zuschneiden & Skalieren",
-        mosaicUploadDesc: "Lade hier ein Bild hoch. Es wird automatisch verarbeitet. Im nächsten Schritt kannst du das Format auswählen.",
-        supportedFormatsShort: "Erlaubte Dateien: JPG, PNG, GIF, WEBP",
-        advancedSettings: "Erweiterte Einstellungen",
-        step2Hint: "Sieht das Bild gut aus? Falls du Farben, Helligkeit oder Kontrast anpassen möchtest, öffne die erweiterten Einstellungen.",
-
         // Get Started section
         getStarted: "Loslegen",
         uploadImage: "Bild hochladen",
@@ -549,12 +513,6 @@ const translations = {
         depthPlatesHelp3: "● Beachten Sie, dass größere Platten schwer von der Basis zu befestigen/entfernen sein können",
         availablePlates: "Verfügbare Platten:",
         
-        // Loading status messages
-        loadingProcessing: "Bild wird verarbeitet\u2026",
-        loadingRendering: "Vorschau wird gerendert\u2026",
-        loadingQuantizing: "Farben werden zugeordnet\u2026",
-        loadingOptimizing: "Teileanzahl wird optimiert\u2026",
-
         // Language
         language: "Sprache",
         english: "Englisch",

@@ -4,7 +4,15 @@ let perfLoggingDatabase;
 try {
     perfLoggingDatabase = firebase.database();
 } catch (_e) {
-    // we don't care if this fails
+    // Firebase removed — create no-op proxy so all .ref().transaction() calls silently succeed
+    perfLoggingDatabase = {
+        ref: function() {
+            return {
+                transaction: function() {},
+                once: function() { return Promise.resolve({ val: function() { return null; } }); }
+            };
+        }
+    };
 }
 
 function incrementTransaction(count) {
@@ -153,16 +161,7 @@ let targetResolution = [
 ];
 const PIXEL_WIDTH_CM = 0.8;
 const INCHES_IN_CM = 0.393701;
-const BASE_SCALING_FACTOR = 40;
-const MAX_CANVAS_DIMENSION = 4096; // Safe for all browsers including mobile
-
-function getScalingFactor(width, height) {
-    const maxDimension = Math.max(width, height);
-    const maxAllowedFactor = Math.floor(MAX_CANVAS_DIMENSION / maxDimension);
-    return Math.max(1, Math.min(BASE_SCALING_FACTOR, maxAllowedFactor));
-}
-
-let SCALING_FACTOR = BASE_SCALING_FACTOR;
+const SCALING_FACTOR = 40;
 
 // Plate dimensions in studs - updated dynamically based on step selectors
 let PLATE_WIDTH = 16;  // width step (plate width in studs)
@@ -664,23 +663,8 @@ INTERPOLATION_ALGORITHMS.forEach((algorithm) => {
 
 // Color distance stuff
 function d3ColorDistanceWrapper(d3DistanceFunction) {
-    const d3ColorCache = new Map();
-
-    function getD3Color(r, g, b) {
-        const key = (r << 16) | (g << 8) | b;
-        let color = d3ColorCache.get(key);
-        if (color === undefined) {
-            color = d3.color(rgbToHex(r, g, b));
-            d3ColorCache.set(key, color);
-        }
-        return color;
-    }
-
     return (c1, c2) =>
-        d3DistanceFunction(
-            getD3Color(c1[0], c1[1], c1[2]),
-            getD3Color(c2[0], c2[1], c2[2])
-        );
+        d3DistanceFunction(d3.color(rgbToHex(c1[0], c1[1], c1[2])), d3.color(rgbToHex(c2[0], c2[1], c2[2])));
 }
 
 function RGBPixelDistanceSquared(pixel1, pixel2) {
@@ -1283,7 +1267,6 @@ const debouncedRunStep2 = debounce(() => {
 }, DEBOUNCE_DELAY);
 
 function runStep2() {
-    SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
     disableInteraction();
     invalidateStepsFrom(3);
     let inputPixelArray;
@@ -1435,7 +1418,6 @@ function getVariablePixelAvailablePartDimensions() {
 let step3VariablePixelPieceDimensions = null;
 
 function runStep3() {
-    SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
     disableInteraction();
     invalidateStepsFrom(4);
     const fiteredPixelArray = getPixelArrayFromCanvas(step2Canvas);
@@ -2125,7 +2107,6 @@ step4Canvas3dUpscaled.addEventListener("mouseleave", function (e) {
 document.getElementById("3d-effect-intensity").addEventListener("change", create3dPreview, false);
 
 function runStep4(asyncCallback) {
-    SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
     disableInteraction();
     const step2PixelArray = getPixelArrayFromCanvas(step2Canvas);
     const step3PixelArray = getPixelArrayFromCanvas(step3Canvas);
@@ -2438,7 +2419,7 @@ async function generateInstructions() {
                 PLATE_WIDTH,
                 PLATE_HEIGHT,
                 filteredAvailableStudHexList,
-                BASE_SCALING_FACTOR,
+                SCALING_FACTOR,
                 step4CanvasUpscaled,
                 titlePageCanvas,
                 selectedPixelPartNumber,
@@ -2512,7 +2493,7 @@ async function generateInstructions() {
                 subPixelArray,
                 PLATE_WIDTH,
                 filteredAvailableStudHexList,
-                BASE_SCALING_FACTOR,
+                SCALING_FACTOR,
                 instructionPageCanvas,
                 i + 1,
                 selectedPixelPartNumber,
@@ -2639,7 +2620,7 @@ async function generateDepthInstructions() {
         generateDepthInstructionTitlePage(
             usedPlatesMatrices,
             targetResolution,
-            BASE_SCALING_FACTOR,
+            SCALING_FACTOR,
             titlePageCanvas,
             step3DepthCanvasUpscaled,
             PLATE_WIDTH
@@ -2684,7 +2665,7 @@ async function generateDepthInstructions() {
             // Don't append to DOM - just use it for rendering
 
             perDepthLevelMatrices = usedPlatesMatrices[i];
-            generateDepthInstructionPage(perDepthLevelMatrices, BASE_SCALING_FACTOR, instructionPageCanvas, i + 1);
+            generateDepthInstructionPage(perDepthLevelMatrices, SCALING_FACTOR, instructionPageCanvas, i + 1);
             setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
 
             // Use correct MIME type for image conversion
@@ -2764,7 +2745,7 @@ document.getElementById("export-depth-to-bricklink-button").addEventListener("cl
 
 function triggerDepthMapGeneration() {
     disableInteraction();
-    const worker = new Worker("mosaic-js/depth-map-web-worker.js");
+    const worker = new Worker("js/depth-map-web-worker.js");
 
     const loadingMessageComponent = document.getElementById("web-worker-loading-message");
     loadingMessageComponent.hidden = false;
@@ -2928,7 +2909,7 @@ function handleInputDepthMapImage(e) {
     reader.readAsDataURL(e.target.files[0]);
 }
 
-const EXAMPLES_BASE_URL = "mosaic-assets/png/";
+const EXAMPLES_BASE_URL = "assets/png/";
 const EXAMPLES = [
     {
         colorFile: "lenna.png",
@@ -3030,12 +3011,6 @@ const depthImageSelectorHidden = document.getElementById("input-depth-image-sele
 depthImageSelectorHidden.addEventListener("change", handleInputDepthMapImage, false);
 document.getElementById("input-depth-image-selector").addEventListener("click", () => {
     depthImageSelectorHidden.click();
-});
-
-window.addEventListener("appinstalled", () => {
-    perfLoggingDatabase.ref("pwa-install-count/total").transaction(incrementTransaction);
-    const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase.ref("pwa-install-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
 });
 
 // Step Navigation System
