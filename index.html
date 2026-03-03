@@ -1896,6 +1896,34 @@
     <script src="js/algo.js"></script>
     <script src="js/index.js"></script>
 
+    <script>
+      // Notify parent iframe of height changes for dynamic resizing
+      (function() {
+        var lastHeight = 0;
+        function postHeight() {
+          var h = Math.max(
+            document.body.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.scrollHeight
+          );
+          if (h !== lastHeight && h > 0) {
+            lastHeight = h;
+            window.parent.postMessage({ type: 'mosaic-resize', height: h }, '*');
+          }
+        }
+        // Poll for height changes (covers dynamic content, accordions, step transitions)
+        setInterval(postHeight, 300);
+        // Also observe DOM mutations
+        if (window.MutationObserver) {
+          new MutationObserver(postHeight).observe(document.body, {
+            childList: true, subtree: true, attributes: true
+          });
+        }
+        // Initial post
+        window.addEventListener('load', function() { setTimeout(postHeight, 100); });
+      })();
+    </script>
+
     <footer>
       <small class="footer">
       </small>
