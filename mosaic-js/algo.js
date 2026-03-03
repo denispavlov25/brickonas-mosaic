@@ -41,11 +41,11 @@ function getPixelArrayFromCanvas(canvas) {
 
 function drawPixelsOnCanvas(pixels, canvas) {
     const context = canvas.getContext("2d");
-
     const imageData = context.createImageData(canvas.width, canvas.height);
-    Object.keys(pixels).forEach((pixel) => {
-        imageData.data[pixel] = pixels[pixel];
-    });
+    const data = imageData.data;
+    for (let i = 0; i < pixels.length && i < data.length; i++) {
+        data[i] = pixels[i];
+    }
     context.putImageData(imageData, 0, 0);
 }
 
@@ -101,7 +101,7 @@ function scaleUpDiscreteDepthPixelsForDisplay(pixels, numLevels) {
 // aligns each pixel in the input array to the closes pixel in the studMap, and adds in overrides
 // returns the resulting pixels
 function alignPixelsToStudMap(inputPixels, studMap, colorDistanceFunction) {
-    const alignedPixels = [...inputPixels]; // initialize this way just so we keep 4th pixel values
+    const alignedPixels = new Uint8ClampedArray(inputPixels); // initialize this way just so we keep 4th pixel values
     // note that 4th pixel values are ignored anyway because it's too much effort to use them
     const anchorPixels = studMapToSortedColorList(studMap).map((pixel) => hexToRgb(pixel));
     
@@ -314,7 +314,7 @@ function correctPixelsForAvailableStuds(
     // sort from worst to best;
     problematicPixels.sort((p1, p2) => p2.alignmentDistSquared - p1.alignmentDistSquared);
 
-    const correctedPixels = [...anchorAlignedPixels];
+    const correctedPixels = new Uint8ClampedArray(anchorAlignedPixels);
     // clear remainingStudMap of any studs mapping to non positive values - we can't use these
     Object.keys(remainingStudMap).forEach((stud) => {
         if (remainingStudMap[stud] <= 0) {
@@ -322,23 +322,30 @@ function correctPixelsForAvailableStuds(
         }
     });
 
+    // Pre-compute RGB values for all colors in the remaining stud map
+    const hexToRgbCache = {};
+    Object.keys(remainingStudMap).forEach(hex => {
+        hexToRgbCache[hex] = hexToRgb(hex);
+    });
+
     // starting from the worst, replace each problematic pixel, and update remainingStudMap
     for (let i = 0; i < problematicPixels.length; i++) {
         const problematicPixel = problematicPixels[i];
         const possibleReplacements = Object.keys(remainingStudMap);
         let replacement = possibleReplacements[0];
-        possibleReplacements.forEach((possibleReplacement) => {
-            if (
-                colorDistanceFunction(problematicPixel.originalRGB, hexToRgb(possibleReplacement)) <
-                colorDistanceFunction(problematicPixel.originalRGB, hexToRgb(replacement))
-            ) {
-                replacement = possibleReplacement;
+        let minDist = colorDistanceFunction(problematicPixel.originalRGB, hexToRgbCache[replacement]);
+        for (let j = 1; j < possibleReplacements.length; j++) {
+            const candidate = possibleReplacements[j];
+            const dist = colorDistanceFunction(problematicPixel.originalRGB, hexToRgbCache[candidate]);
+            if (dist < minDist) {
+                minDist = dist;
+                replacement = candidate;
             }
-        });
+        }
 
         // replace the pixel in correctedPixels with our replacement
         const pixelIndex = problematicPixel.index;
-        const replacementRGB = hexToRgb(replacement);
+        const replacementRGB = hexToRgbCache[replacement];
         for (let j = 0; j < 3; j++) {
             correctedPixels[pixelIndex + j] = replacementRGB[j];
         }
@@ -348,6 +355,7 @@ function correctPixelsForAvailableStuds(
         if (remainingStudMap[replacement] <= 0) {
             // clear this out if we ran out of these studs
             delete remainingStudMap[replacement];
+            delete hexToRgbCache[replacement];
         }
     }
 
@@ -539,19 +547,22 @@ const SIERRA_DITHERING_KERNEL = [
     },
 ];
 
-function findReplacement(pixelRGB, remainingStudMap, colorDistanceFunction) {
+function findReplacement(pixelRGB, remainingStudMap, colorDistanceFunction, hexToRgbCache) {
     const possibleReplacements = Object.keys(remainingStudMap);
     let replacement = possibleReplacements[0];
-    possibleReplacements.forEach((possibleReplacement) => {
-        if (
-            remainingStudMap[possibleReplacement] > 0 &&
-            colorDistanceFunction(pixelRGB, hexToRgb(possibleReplacement)) <
-                colorDistanceFunction(pixelRGB, hexToRgb(replacement))
-        ) {
-            replacement = possibleReplacement;
+    const getRgb = hexToRgbCache ? (hex) => hexToRgbCache[hex] : hexToRgb;
+    let minDistance = colorDistanceFunction(pixelRGB, getRgb(replacement));
+    for (let i = 1; i < possibleReplacements.length; i++) {
+        const candidate = possibleReplacements[i];
+        if (remainingStudMap[candidate] > 0) {
+            const dist = colorDistanceFunction(pixelRGB, getRgb(candidate));
+            if (dist < minDistance) {
+                minDistance = dist;
+                replacement = candidate;
+            }
         }
-    });
-    return hexToRgb(replacement);
+    }
+    return getRgb(replacement);
 }
 
 function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
@@ -564,6 +575,12 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
 ) {
     availableStudMap = JSON.parse(JSON.stringify(availableStudMap)); // clone
 
+    // Pre-compute RGB values for all colors in the stud map
+    const hexToRgbCache = {};
+    Object.keys(availableStudMap).forEach(hex => {
+        hexToRgbCache[hex] = hexToRgb(hex);
+    });
+
     // We use this to easily get adjacent pixels when propogating dithering error
     const pixelMatrix = [];
     const height = Math.floor(originalPixels.length / 4 / imageWidth);
@@ -574,7 +591,7 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
 
             const pixelRGB = [originalPixels[i], originalPixels[i + 1], originalPixels[i + 2]];
 
-            const tentativeReplacementRGB = findReplacement(pixelRGB, availableStudMap, colorDistanceFunction);
+            const tentativeReplacementRGB = findReplacement(pixelRGB, availableStudMap, colorDistanceFunction, hexToRgbCache);
             const tentativeReplacementDistance = colorDistanceFunction(pixelRGB, tentativeReplacementRGB);
             const pixel = {
                 pixelRGB,
@@ -583,21 +600,32 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
                 col,
                 tentativeReplacementRGB,
                 tentativeReplacementDistance,
+                heapGeneration: 0,
             };
             pixelMatrix[row][col] = pixel;
         }
     }
 
+    // Use wrapper objects for lazy heap deletion (avoids O(n) Heap.remove calls)
     const comparator = (b, a) => a.tentativeReplacementDistance - b.tentativeReplacementDistance;
     let pixelQueue = new Heap(comparator);
 
-    pixelQueue.init(pixelMatrix.flat());
+    const wrappers = pixelMatrix.flat().map(p => ({
+        pixel: p,
+        generation: 0,
+        tentativeReplacementDistance: p.tentativeReplacementDistance,
+    }));
+    pixelQueue.init(wrappers);
 
     while (!pixelQueue.isEmpty()) {
-        const nextPixel = pixelQueue.pop();
+        const entry = pixelQueue.pop();
+        const nextPixel = entry.pixel;
+
+        // Skip stale entries (pixel already processed or re-added with newer generation)
+        if (!nextPixel.isInPixelQueue) continue;
+        if (nextPixel.heapGeneration !== entry.generation) continue;
 
         // Do this in the RGB color space so we can cleanly spread this around if we're doing dithering
-        // TODO: see if/how this messes with other color distance functions
         const dequeuedPixelQuantizationError = [
             nextPixel.pixelRGB[0] - nextPixel.tentativeReplacementRGB[0],
             nextPixel.pixelRGB[1] - nextPixel.tentativeReplacementRGB[1],
@@ -611,22 +639,28 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
             const pixelHex = rgbToHex(nextPixel.pixelRGB[0], nextPixel.pixelRGB[1], nextPixel.pixelRGB[2]);
             availableStudMap[pixelHex] = availableStudMap[pixelHex] - 1;
             if (availableStudMap[pixelHex] === 0) {
-                // we're out of parts in this color - reassign the nodes and rebuild the heap
-                const oldHeapPixels = [...pixelQueue.heapArray];
-                oldHeapPixels.forEach((oldPixel) => {
-                    const tentativeReplacementRGB = findReplacement(
-                        oldPixel.pixelRGB,
-                        availableStudMap,
-                        colorDistanceFunction
-                    );
-                    const tentativeReplacementDistance = colorDistanceFunction(
-                        oldPixel.pixelRGB,
-                        tentativeReplacementRGB
-                    );
-                    oldPixel.tentativeReplacementRGB = tentativeReplacementRGB;
-                    oldPixel.tentativeReplacementDistance = tentativeReplacementDistance;
+                // we're out of parts in this color
+                const exhaustedRGB = hexToRgbCache[pixelHex];
+                delete availableStudMap[pixelHex];
+                delete hexToRgbCache[pixelHex];
+
+                // Only recompute pixels whose tentative replacement was the exhausted color
+                let needsRebuild = false;
+                pixelQueue.heapArray.forEach((wrapper) => {
+                    const p = wrapper.pixel;
+                    if (p.isInPixelQueue &&
+                        p.tentativeReplacementRGB[0] === exhaustedRGB[0] &&
+                        p.tentativeReplacementRGB[1] === exhaustedRGB[1] &&
+                        p.tentativeReplacementRGB[2] === exhaustedRGB[2]) {
+                        const newRGB = findReplacement(p.pixelRGB, availableStudMap, colorDistanceFunction, hexToRgbCache);
+                        const newDist = colorDistanceFunction(p.pixelRGB, newRGB);
+                        p.tentativeReplacementRGB = newRGB;
+                        p.tentativeReplacementDistance = newDist;
+                        wrapper.tentativeReplacementDistance = newDist;
+                        needsRebuild = true;
+                    }
                 });
-                pixelQueue.init(); // heapify
+                if (needsRebuild) pixelQueue.init(); // heapify
             }
         }
 
@@ -638,7 +672,6 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
             const kernelRowMiddle = Math.floor(kernelHeight / 2);
             const kernelColMiddle = Math.floor(kernelWidth / 2);
 
-            let totalNeighborhoodPixels = 0;
             let errorDenominator = 0;
             for (let kr = 0; kr < kernelHeight; kr++) {
                 for (let kc = 0; kc < kernelWidth; kc++) {
@@ -647,7 +680,6 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
                         const pixelMatrixCol = nextPixel.col - kernelColMiddle + kc;
                         const neighborhoodPixel = (pixelMatrix[pixelMatrixRow] || {})[pixelMatrixCol];
                         if (neighborhoodPixel != null && neighborhoodPixel.isInPixelQueue) {
-                            totalNeighborhoodPixels++;
                             errorDenominator += kernel[kr][kc];
                         }
                     }
@@ -674,7 +706,8 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
                                 const tentativeReplacementRGB = findReplacement(
                                     neighborhoodPixel.pixelRGB,
                                     availableStudMap,
-                                    colorDistanceFunction
+                                    colorDistanceFunction,
+                                    hexToRgbCache
                                 );
                                 const tentativeReplacementDistance = colorDistanceFunction(
                                     neighborhoodPixel.pixelRGB,
@@ -689,8 +722,13 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
                                     oldReplacementRGB[1] != neighborhoodPixel.tentativeReplacementRGB[1] ||
                                     oldReplacementRGB[2] != neighborhoodPixel.tentativeReplacementRGB[2]
                                 ) {
-                                    pixelQueue.remove(neighborhoodPixel);
-                                    pixelQueue.add(neighborhoodPixel);
+                                    // Lazy heap deletion: add new entry instead of remove+add (O(log n) vs O(n))
+                                    neighborhoodPixel.heapGeneration++;
+                                    pixelQueue.add({
+                                        pixel: neighborhoodPixel,
+                                        generation: neighborhoodPixel.heapGeneration,
+                                        tentativeReplacementDistance: neighborhoodPixel.tentativeReplacementDistance,
+                                    });
                                 }
                             }
                         }
@@ -700,16 +738,18 @@ function correctPixelsForAvailableStudsWithGreedyDynamicDithering(
         }
     }
 
-    const result = [];
+    const resultLength = imageWidth * height * 4;
+    const result = new Uint8ClampedArray(resultLength);
+    let idx = 0;
     pixelMatrix.forEach((row) =>
         row.forEach((pixel) => {
-            pixel.tentativeReplacementRGB.forEach((channel) => {
-                result.push(channel);
-            });
-            result.push(255);
+            result[idx++] = pixel.pixelRGB[0];
+            result[idx++] = pixel.pixelRGB[1];
+            result[idx++] = pixel.pixelRGB[2];
+            result[idx++] = 255;
         })
     );
-    return new Uint8ClampedArray(result);
+    return result;
 }
 
 function alignPixelsWithTraditionalDithering(
@@ -720,6 +760,12 @@ function alignPixelsWithTraditionalDithering(
     kernel
 ) {
     availableStudMap = JSON.parse(JSON.stringify(availableStudMap)); // clone
+
+    // Pre-compute RGB values for all colors in the stud map
+    const hexToRgbCache = {};
+    Object.keys(availableStudMap).forEach(hex => {
+        hexToRgbCache[hex] = hexToRgb(hex);
+    });
 
     // We use this to easily get adjacent pixels when propogating dithering error
     const pixelMatrix = [];
@@ -743,7 +789,7 @@ function alignPixelsWithTraditionalDithering(
     for (let row = 0; row < height; row++) {
         for (let col = 0; col < imageWidth; col++) {
             const currentPixel = pixelMatrix[row][col];
-            const replacementRGB = findReplacement(currentPixel.pixelRGB, availableStudMap, colorDistanceFunction);
+            const replacementRGB = findReplacement(currentPixel.pixelRGB, availableStudMap, colorDistanceFunction, hexToRgbCache);
             const currentPixelQuantizationError = [
                 currentPixel.pixelRGB[0] - replacementRGB[0],
                 currentPixel.pixelRGB[1] - replacementRGB[1],
@@ -768,16 +814,18 @@ function alignPixelsWithTraditionalDithering(
         }
     }
 
-    const result = [];
+    const resultLength = imageWidth * height * 4;
+    const result = new Uint8ClampedArray(resultLength);
+    let idx = 0;
     pixelMatrix.forEach((row) =>
         row.forEach((pixel) => {
-            pixel.pixelRGB.forEach((channel) => {
-                result.push(channel);
-            });
-            result.push(255);
+            result[idx++] = pixel.pixelRGB[0];
+            result[idx++] = pixel.pixelRGB[1];
+            result[idx++] = pixel.pixelRGB[2];
+            result[idx++] = 255;
         })
     );
-    return new Uint8ClampedArray(result);
+    return result;
 }
 
 // input: r,g,b in [0,1], out: h in [0,360) and s,v in [0,1]
@@ -806,7 +854,7 @@ function adjustHSV(rgbPixel, h, s, v) {
 }
 
 function applyPixelFilter(inputPixels, rgbFilter) {
-    const outputPixels = [...inputPixels];
+    const outputPixels = new Uint8ClampedArray(inputPixels);
     for (let i = 0; i < inputPixels.length; i += 4) {
         const filteredPixel = rgbFilter([inputPixels[i], inputPixels[i + 1], inputPixels[i + 2]]);
         for (let j = 0; j < 3; j++) {
@@ -861,7 +909,7 @@ function getDarkenedStudMap(studMap) {
 }
 
 function getDarkenedImage(pixels) {
-    const outputPixels = [...pixels];
+    const outputPixels = new Uint8ClampedArray(pixels);
     for (let i = 0; i < pixels.length; i += 4) {
         if (pixels[i] != null && pixels[i + 1] != null && pixels[i + 2] != null) {
             const darkenedPixel = getDarkenedPixel([pixels[i], pixels[i + 1], pixels[i + 2]]);
@@ -874,7 +922,7 @@ function getDarkenedImage(pixels) {
 }
 
 function revertDarkenedImage(pixels, darkenedStudsToStuds) {
-    const outputPixels = [...pixels];
+    const outputPixels = new Uint8ClampedArray(pixels);
     for (let i = 0; i < pixels.length; i += 4) {
         const pixelHex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
         const revertedPixelHex = pixelHex === "#000000" ? "#000000" : darkenedStudsToStuds[pixelHex];
@@ -935,8 +983,18 @@ function drawStudImageOnCanvas(
 
     const radius = scalingFactor / 2;
     const totalPixels = pixels.length / 4;
-    
-    // Group pixels by color for batch rendering (optimization)
+    const isCircle = [PIXEL_TYPE_OPTIONS[0].number, PIXEL_TYPE_OPTIONS[1].number].includes(pixelType);
+    const isVariable = ("" + pixelType).match("^variable.*$");
+    const needsStroke = !isVariable;
+    const needsStudCircle = [
+        PIXEL_TYPE_OPTIONS[1].number,
+        PIXEL_TYPE_OPTIONS[3].number,
+        PIXEL_TYPE_OPTIONS[4].number,
+        PIXEL_TYPE_OPTIONS[6].number,
+        PIXEL_TYPE_OPTIONS[7].number,
+    ].includes(pixelType);
+
+    // Group pixels by color for batch rendering
     const pixelsByColor = new Map();
     for (let i = 0; i < totalPixels; i++) {
         const pixelHex = rgbToHex(pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]);
@@ -945,45 +1003,44 @@ function drawStudImageOnCanvas(
         }
         pixelsByColor.get(pixelHex).push(i);
     }
-    
-    // Draw pixels grouped by color (reduces context switches)
+
+    // Draw pixels grouped by color using Path2D batching (reduces draw calls from N to ~90)
     for (const [pixelHex, indices] of pixelsByColor) {
-        ctx.fillStyle = pixelHex;
-        ctx.strokeStyle = "#111111";
-        
+        const fillPath = new Path2D();
+        const studPath = needsStudCircle ? new Path2D() : null;
+
         for (const i of indices) {
             const x = (i % width) * 2 * radius;
             const y = Math.floor(i / width) * 2 * radius;
-            
-            ctx.beginPath();
-            if ([PIXEL_TYPE_OPTIONS[0].number, PIXEL_TYPE_OPTIONS[1].number].includes(pixelType)) {
-                ctx.arc(x + radius, y + radius, radius, 0, 2 * Math.PI);
+
+            if (isCircle) {
+                fillPath.arc(x + radius, y + radius, radius, 0, 2 * Math.PI);
+                fillPath.closePath();
             } else {
-                ctx.rect(x, y, 2 * radius, 2 * radius);
+                fillPath.rect(x, y, 2 * radius, 2 * radius);
             }
-            ctx.fill();
-            if (!("" + pixelType).match("^variable.*$")) {
-                ctx.stroke();
+
+            if (studPath) {
+                studPath.arc(x + radius, y + radius, radius * 0.6, 0, 2 * Math.PI);
+                studPath.closePath();
             }
-            
-            // Draw stud circle if needed
-            if (
-                [
-                    PIXEL_TYPE_OPTIONS[1].number,
-                    PIXEL_TYPE_OPTIONS[3].number,
-                    PIXEL_TYPE_OPTIONS[4].number,
-                    PIXEL_TYPE_OPTIONS[6].number,
-                    PIXEL_TYPE_OPTIONS[7].number,
-                ].includes(pixelType)
-            ) {
-                ctx.beginPath();
-                ctx.arc(x + radius, y + radius, radius * 0.6, 0, 2 * Math.PI);
-                ctx.stroke();
-            }
+        }
+
+        ctx.fillStyle = pixelHex;
+        ctx.fill(fillPath);
+
+        if (needsStroke) {
+            ctx.strokeStyle = "#111111";
+            ctx.stroke(fillPath);
+        }
+
+        if (studPath) {
+            ctx.strokeStyle = "#111111";
+            ctx.stroke(studPath);
         }
     }
 
-    if (("" + pixelType).match("^variable.*$") && plateDimensionsOverlay) {
+    if (isVariable && plateDimensionsOverlay) {
         ctx.strokeStyle = "#888888";
         ctx.lineWidth = 5;
         for (let row = 0; row < plateDimensionsOverlay.length; row++) {
