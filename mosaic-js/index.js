@@ -165,10 +165,11 @@ let targetResolution = [
 ];
 const PIXEL_WIDTH_CM = 0.8;
 const INCHES_IN_CM = 0.393701;
-// Dynamic scaling: cap upscaled canvas at ~5120px per side to avoid
-// memory exhaustion (each 11520×11520 RGBA canvas ≈ 530 MB).
-// At 288×288 this gives factor 17 instead of 40, cutting memory 5×.
-const MAX_UPSCALED_PX = 5120;
+// Dynamic scaling: cap upscaled canvas to avoid browser memory limits.
+// Most browsers hard-limit individual canvases around 4096×4096 or ~256 MB
+// total canvas memory. We keep each canvas under ~2560px per side so a pair
+// of upscaled canvases (color + depth) stays well within safe limits.
+const MAX_UPSCALED_PX = 2560;
 let SCALING_FACTOR = 40;
 function updateScalingFactor() {
     const maxDim = Math.max(targetResolution[0], targetResolution[1]);
@@ -1285,6 +1286,7 @@ function runStep2() {
     invalidateStepsFrom(3);
 
     runAfterOverlayPaint(() => {
+      try {
         let inputPixelArray;
         if (selectedInterpolationAlgorithm === "default") {
             const croppedCanvas = inputImageCropper.getCroppedCanvas({
@@ -1378,6 +1380,7 @@ function runStep2() {
 
         showLoadingStatus(t('loadingRendering'));
         setTimeout(() => {
+          try {
             step2CanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
             step2CanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
             step2CanvasUpscaledContext.imageSmoothingEnabled = false;
@@ -1402,7 +1405,17 @@ function runStep2() {
             );
             stepProcessed[2] = true;
             enableInteraction();
+          } catch (renderErr) {
+            console.error("Step 2 render failed:", renderErr);
+            stepProcessed[2] = true;
+            enableInteraction();
+          }
         }, 1);
+      } catch (e) {
+        console.error("Step 2 processing failed:", e);
+        stepProcessed[2] = true;
+        enableInteraction();
+      }
     });
 }
 
@@ -1441,6 +1454,7 @@ function runStep3() {
     invalidateStepsFrom(4);
 
     runAfterOverlayPaint(() => {
+      try {
         const fiteredPixelArray = getPixelArrayFromCanvas(step2Canvas);
 
         let alignedPixelArray;
@@ -1544,6 +1558,7 @@ function runStep3() {
 
         showLoadingStatus(t('loadingRendering'));
         setTimeout(() => {
+          try {
             step3CanvasUpscaledContext.imageSmoothingEnabled = false;
             drawStudImageOnCanvas(
                 isBleedthroughEnabled()
@@ -1572,7 +1587,17 @@ function runStep3() {
             );
             stepProcessed[3] = true;
             enableInteraction();
+          } catch (renderErr) {
+            console.error("Step 3 render failed:", renderErr);
+            stepProcessed[3] = true;
+            enableInteraction();
+          }
         }, 1);
+      } catch (e) {
+        console.error("Step 3 processing failed:", e);
+        stepProcessed[3] = true;
+        enableInteraction();
+      }
     });
 }
 
@@ -3077,10 +3102,10 @@ function runStepProcessing(stepNumber) {
     
     function runStepsSequentially(stepsToRun, index) {
         if (index >= stepsToRun.length) return;
-        
+
         const step = stepsToRun[index];
         const wasProcessed = stepProcessed[step];
-        
+
         if (!wasProcessed) {
             // Get the step function
             const stepFunctions = {
@@ -3089,16 +3114,24 @@ function runStepProcessing(stepNumber) {
                 3: runStep3Only,
                 4: runStep4Only
             };
-            
+
             // Run the step - it will set stepProcessed and call enableInteraction when done
             stepFunctions[step]();
-            
+
             // Wait for step to complete before running next
-            // Check stepProcessed flag periodically
+            // Check stepProcessed flag periodically, with a timeout safeguard
+            let elapsed = 0;
+            const STEP_TIMEOUT_MS = 60000; // 60s max per step
             const checkComplete = setInterval(() => {
+                elapsed += 50;
                 if (stepProcessed[step]) {
                     clearInterval(checkComplete);
                     runStepsSequentially(stepsToRun, index + 1);
+                } else if (elapsed >= STEP_TIMEOUT_MS) {
+                    clearInterval(checkComplete);
+                    console.error("Step " + step + " timed out after " + STEP_TIMEOUT_MS + "ms");
+                    stepProcessed[step] = true;
+                    enableInteraction();
                 }
             }, 50);
         } else {
