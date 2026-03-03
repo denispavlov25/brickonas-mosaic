@@ -1,11 +1,6 @@
 const VERSION_NUMBER = "v2022.12.11";
 
 let perfLoggingDatabase;
-try {
-    perfLoggingDatabase = firebase.database();
-} catch (_e) {
-    // we don't care if this fails
-}
 
 function incrementTransaction(count) {
     return (count || 0) + 1;
@@ -206,9 +201,9 @@ function enableDepth() {
     create3dPreview();
     depthEnabled = true;
 
-    perfLoggingDatabase.ref("enable-depth-count/total").transaction(incrementTransaction);
+    perfLoggingDatabase && perfLoggingDatabase.ref("enable-depth-count/total").transaction(incrementTransaction);
     const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase.ref("enable-depth-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
+    perfLoggingDatabase && perfLoggingDatabase.ref("enable-depth-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
 }
 if (window.location.href.includes("enable3d")) {
     enableDepth();
@@ -2517,11 +2512,11 @@ async function generateInstructions() {
         document.getElementById("download-instructions-button").hidden = false;
         enableInteraction();
 
-        perfLoggingDatabase.ref("instructions-generated-count/total").transaction(incrementTransaction);
-        const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-        perfLoggingDatabase
-            .ref("instructions-generated-count/per-day/" + loggingTimestamp)
-            .transaction(incrementTransaction);
+        if (perfLoggingDatabase) {
+            perfLoggingDatabase.ref("instructions-generated-count/total").transaction(incrementTransaction);
+            const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000);
+            perfLoggingDatabase.ref("instructions-generated-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
+        }
         } catch (error) {
             console.error("Error generating PDF instructions:", error);
             document.getElementById("pdf-progress-container").hidden = true;
@@ -2680,11 +2675,11 @@ async function generateDepthInstructions() {
         document.getElementById("download-depth-instructions-button").hidden = false;
         enableInteraction();
 
-        perfLoggingDatabase.ref("depth-instructions-generated-count/total").transaction(incrementTransaction);
-        const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-        perfLoggingDatabase
-            .ref("depth-instructions-generated-count/per-day/" + loggingTimestamp)
-            .transaction(incrementTransaction);
+        if (perfLoggingDatabase) {
+            perfLoggingDatabase.ref("depth-instructions-generated-count/total").transaction(incrementTransaction);
+            const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000);
+            perfLoggingDatabase.ref("depth-instructions-generated-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
+        }
         } catch (error) {
             console.error("Error generating depth PDF instructions:", error);
             document.getElementById("depth-pdf-progress-container").hidden = true;
@@ -2695,21 +2690,6 @@ async function generateDepthInstructions() {
     });
 }
 
-document.getElementById("hogwarts-crest-example-instructions-link").addEventListener("click", () => {
-    perfLoggingDatabase.ref("examples-click-count/hogwarts-crest-instructions/total").transaction(incrementTransaction);
-    const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase
-        .ref("examples-click-count/hogwarts-crest-instructions/per-day/" + loggingTimestamp)
-        .transaction(incrementTransaction);
-});
-
-document.getElementById("31201-lego-website-link").addEventListener("click", () => {
-    perfLoggingDatabase.ref("examples-click-count/31201-lego-website-link/total").transaction(incrementTransaction);
-    const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase
-        .ref("examples-click-count/31201-lego-website-link/per-day/" + loggingTimestamp)
-        .transaction(incrementTransaction);
-});
 
 document.getElementById("download-instructions-button").addEventListener("click", async () => {
     await generateInstructions();
@@ -2736,6 +2716,8 @@ document.getElementById("export-depth-to-bricklink-button").addEventListener("cl
 });
 
 function triggerDepthMapGeneration() {
+    alert("Depth map auto-generation is not available. Please upload your own depth map image.");
+    return;
     disableInteraction();
     const worker = new Worker("js/depth-map-web-worker.js");
 
@@ -2797,7 +2779,8 @@ function triggerDepthMapGeneration() {
     }, 50); // TODO: find better way to check that input is finished
 }
 
-document.getElementById("generate-depth-image").addEventListener("click", triggerDepthMapGeneration);
+var generateDepthBtn = document.getElementById("generate-depth-image");
+if (generateDepthBtn) generateDepthBtn.addEventListener("click", triggerDepthMapGeneration);
 
 const SERIALIZE_EDGE_LENGTH = 512;
 
@@ -2840,7 +2823,8 @@ function handleInputImage(e, dontClearDepth, dontLog) {
         document.getElementById("input-image-selector").innerHTML = t('reselectInputImage');
         document.getElementById("image-input-new").appendChild(document.getElementById("image-input"));
         document.getElementById("image-input-card").hidden = true;
-        document.getElementById("run-example-input-container").hidden = true;
+        var exContainer = document.getElementById("run-example-input-container");
+        if (exContainer) exContainer.hidden = true;
         setTimeout(() => {
             step1CanvasUpscaled.width = SERIALIZE_EDGE_LENGTH;
             step1CanvasUpscaled.height = Math.floor((SERIALIZE_EDGE_LENGTH * inputImage.height) / inputImage.width);
@@ -2863,9 +2847,9 @@ function handleInputImage(e, dontClearDepth, dontLog) {
         }, 50); // TODO: find better way to check that input is finished
 
         if (!dontLog) {
-            perfLoggingDatabase.ref("input-image-count/total").transaction(incrementTransaction);
+            perfLoggingDatabase && perfLoggingDatabase.ref("input-image-count/total").transaction(incrementTransaction);
             const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-            perfLoggingDatabase.ref("input-image-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
+            perfLoggingDatabase && perfLoggingDatabase.ref("input-image-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
         }
     };
     reader.readAsDataURL(e.target.files[0]);
@@ -2901,66 +2885,6 @@ function handleInputDepthMapImage(e) {
     reader.readAsDataURL(e.target.files[0]);
 }
 
-const EXAMPLES_BASE_URL = "assets/png/";
-const EXAMPLES = [
-    {
-        colorFile: "lenna.png",
-        depthFile: "lenna-depth.png",
-    },
-];
-document.getElementById("run-example-input").addEventListener("click", () => {
-    disableInteraction();
-    const example = EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
-
-    // load in depth first, then trigger step 1
-    fetch(EXAMPLES_BASE_URL + example.depthFile)
-        .then((response) => response.blob())
-        .then((depthImage) => {
-            enableDepth();
-            // use an object url to get around possible bad browser caching race conditions
-            const depthImageURL = URL.createObjectURL(depthImage);
-            const depthReader = new FileReader();
-            depthReader.onload = function (event) {
-                inputDepthImage = new Image();
-                inputDepthImage.onload = function () {
-                    inputDepthCanvas.width = SERIALIZE_EDGE_LENGTH;
-                    inputDepthCanvas.height = SERIALIZE_EDGE_LENGTH;
-                    inputDepthCanvasContext.drawImage(
-                        inputDepthImage,
-                        0,
-                        0,
-                        inputDepthImage.width,
-                        inputDepthImage.height,
-                        0,
-                        0,
-                        SERIALIZE_EDGE_LENGTH,
-                        SERIALIZE_EDGE_LENGTH
-                    );
-                };
-                inputDepthImage.src = depthImageURL;
-                setTimeout(() => {
-                    fetch(EXAMPLES_BASE_URL + example.colorFile)
-                        .then((response) => response.blob())
-                        .then((colorImage) => {
-                            // use an object url to get around possible bad browser caching race conditions
-                            const colorImageURL = URL.createObjectURL(colorImage);
-                            const e = {
-                                target: {
-                                    files: [colorImage],
-                                },
-                            };
-                            handleInputImage(e, true, true);
-                        });
-                }, 50); // TODO: find better way to check that input is finished
-            };
-            depthReader.readAsDataURL(depthImage);
-        });
-    perfLoggingDatabase.ref("trigger-random-example-input-count/total").transaction(incrementTransaction);
-    const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase
-        .ref("trigger-random-example-input-count/per-day/" + loggingTimestamp)
-        .transaction(incrementTransaction);
-});
 
 const imageURLMatch =
     window.location.href.match(
@@ -3006,9 +2930,9 @@ document.getElementById("input-depth-image-selector").addEventListener("click", 
 });
 
 window.addEventListener("appinstalled", () => {
-    perfLoggingDatabase.ref("pwa-install-count/total").transaction(incrementTransaction);
+    perfLoggingDatabase && perfLoggingDatabase.ref("pwa-install-count/total").transaction(incrementTransaction);
     const loggingTimestamp = Math.floor((Date.now() - (Date.now() % 8.64e7)) / 1000); // 8.64e+7 = ms in day
-    perfLoggingDatabase.ref("pwa-install-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
+    perfLoggingDatabase && perfLoggingDatabase.ref("pwa-install-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
 });
 
 // Step Navigation System
