@@ -19,6 +19,11 @@
       referrerpolicy="no-referrer"
     />
     <link href="assets/png/icon-192x192.png" rel="icon" type="image/x-icon" />
+
+    <!-- Preconnect to CDN origins for faster script loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://code.jquery.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1944,44 +1949,27 @@
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", handleDarkModeChange);
     </script>
 
-    <!-- Optional JavaScript -->
+    <!-- JavaScript — all deferred for parallel download + ordered execution -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"
-      crossorigin="anonymous"
-    ></script>
+    <script defer src="https://code.jquery.com/jquery-3.2.1.slim.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
 
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.debug.js"
-      integrity="sha384-NaWTHo/8YCBYJ59830LTz/P4aQZK1sS0SneOgAvhsIl3zBu8r9RevNg5lHCHAuQ/"
-      crossorigin="anonymous"
-    ></script>
-    <script src="https://d3js.org/d3.v5.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-color-difference"></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/2.0.0-alpha.2/cropper.min.js"
-      integrity="sha512-IlZV3863HqEgMeFLVllRjbNOoh8uVj0kgx0aYxgt4rdBABTZCl/h5MfshHD9BrnVs6Rs9yNN7kUQpzhcLkNmHw=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    ></script>
-    <script src="js/pixi.min.js"></script>
-    <script src="js/bricklink-colors.js"></script>
-    <script src="js/stud-maps.js"></script>
-    <script src="js/heap.js"></script>
-    <script src="js/i18n.js"></script>
-    <script src="js/algo.js"></script>
-    <script src="js/index.js"></script>
-    <script src="js/metrics.js"></script>
+    <!-- jsPDF minified (was debug), d3-color only (was full d3.v5.js ~500KB) -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/d3-color@3"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/d3-color-difference"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/2.0.0-alpha.2/cropper.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <!-- App scripts -->
+    <script defer src="js/pixi.min.js"></script>
+    <script defer src="js/bricklink-colors.js"></script>
+    <script defer src="js/stud-maps.js"></script>
+    <script defer src="js/heap.js"></script>
+    <script defer src="js/i18n.js"></script>
+    <script defer src="js/algo.js"></script>
+    <script defer src="js/index.js"></script>
+    <script defer src="js/metrics.js"></script>
 
     <!-- Iframe communication for WordPress embed -->
     <script>
