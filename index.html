@@ -72,6 +72,12 @@
         overflow-x: hidden;
       }
 
+      /* When loaded inside an iframe, use transparent background
+         so the parent page's background shows through */
+      html.in-iframe, html.in-iframe body {
+        background: transparent;
+      }
+
       /* ============================================
          MOSAIC CONFIGURATOR - Redesigned Styles
          ============================================ */
@@ -85,6 +91,8 @@
 
       /* Page layout */
       .mosaic-page { background: var(--off-white); min-height: 100vh; }
+      /* In iframe mode, don't force full viewport height */
+      html.in-iframe .mosaic-page { min-height: auto; background: transparent; }
       .mosaic-configurator { max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
 
       /* ---- Progress Stepper ---- */
@@ -1670,11 +1678,28 @@
       window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", handleDarkModeChange);
 
       // ── Iframe resize communication ──
+      var isInIframe = window.parent !== window;
+
+      // Mark html for iframe-specific CSS
+      if (isInIframe) {
+        document.documentElement.classList.add('in-iframe');
+      }
+
+      function getContentHeight() {
+        // Use the actual content height, not scrollHeight (which includes min-height)
+        var mosaicPage = document.querySelector('.mosaic-page');
+        if (mosaicPage) {
+          var rect = mosaicPage.getBoundingClientRect();
+          return Math.ceil(rect.bottom);
+        }
+        return document.documentElement.scrollHeight;
+      }
+
       function notifyParentResize() {
-        if (window.parent !== window) {
+        if (isInIframe) {
           window.parent.postMessage({
             type: 'mosaic-resize',
-            height: document.documentElement.scrollHeight
+            height: getContentHeight()
           }, '*');
         }
       }
@@ -1683,6 +1708,9 @@
       var resizeObserver = new ResizeObserver(notifyParentResize);
       resizeObserver.observe(document.body);
       window.addEventListener('load', notifyParentResize);
+      // Also notify after short delay to catch late-rendering content
+      setTimeout(notifyParentResize, 500);
+      setTimeout(notifyParentResize, 1500);
 
       // ── Language from URL parameter ──
       (function() {
