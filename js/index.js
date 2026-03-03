@@ -47,17 +47,16 @@ const interactionSelectors = [
     "infinite-piece-count-check",
     "high-quality-instructions-check",
     "input-depth-image-selector",
-    "generate-depth-image",
     "num-depth-levels-slider",
     "download-depth-instructions-button",
     "high-quality-depth-instructions-check",
     "export-depth-to-bricklink-button",
-].map((id) => document.getElementById(id));
+].map((id) => document.getElementById(id)).filter(Boolean);
 
 const customStudTableBody = document.getElementById("custom-stud-table-body");
 
 function disableInteraction() {
-    interactionSelectors.forEach((button) => (button.disabled = true));
+    interactionSelectors.forEach((button) => { if (button) button.disabled = true; });
     [...document.getElementsByTagName("input")].forEach((button) => (button.disabled = true));
     [...document.getElementsByClassName("btn")].forEach((button) => (button.disabled = true));
     [...document.getElementsByClassName("nav-link")].forEach((link) => (link.className = link.className + " disabled"));
@@ -73,7 +72,7 @@ function disableInteraction() {
 }
 
 function enableInteraction() {
-    interactionSelectors.forEach((button) => (button.disabled = false));
+    interactionSelectors.forEach((button) => { if (button) button.disabled = false; });
     [...document.getElementsByTagName("input")].forEach((button) => {
         button.disabled = button.className.includes("always-disabled");
     });
@@ -2151,7 +2150,7 @@ function runStep4(asyncCallback) {
                 step2PixelArray,
                 isBleedthroughEnabled() ? getDarkenedImage(overridePixelArray) : overridePixelArray,
                 selectedTiebreakTechnique,
-                document.getElementById("color-tie-grouping-factor-slider").value,
+                (document.getElementById("color-tie-grouping-factor-slider") || {value: 0.001}).value,
                 targetResolution[0],
                 colorDistanceFunction
             );
