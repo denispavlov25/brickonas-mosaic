@@ -15,27 +15,27 @@ const translations = {
         backRefine: "\u2190 Zurück: Farben verfeinern",
         refineColorsSubtitle: "Bearbeite einzelne Pixel mit dem Pinsel, um dein Mosaik zu perfektionieren",
 
-        // Old step references (kept for backward compat in processing code)
-        step1Crop: "Schritt 1: Zuschneiden",
-        step2Adjust: "Schritt 2: Anpassen",
-        step3Colors: "Schritt 3: Farben",
-        step4Output: "Schritt 4: Ausgabe",
+        // Step references (used by processing code and UI headers)
+        step1Crop: "Zuschneiden",
+        step2Adjust: "Anpassen",
+        step3Colors: "Farben verfeinern",
+        step4Output: "Ergebnis",
         step1: "Schritt 1",
         step2: "Schritt 2",
         step3: "Schritt 3",
-        step4: "Schritt 4",
-        step2Header: "Schritt 2",
-        step3Header: "Schritt 3",
-        step4Header: "Schritt 4",
+        step4: "Ergebnis",
+        step2Header: "Anpassen",
+        step3Header: "Farben verfeinern",
+        step4Header: "Ergebnis",
 
         // Step subtitles
         step1DepthSubtitle: "Tiefenkarte erhalten",
         step1DepthSubtitle2: "Tiefenkarten-Zuschnitt entspricht dem Eingabebild",
-        step2Subtitle: "Interpolieren + Farben anpassen",
+        step2Subtitle: "Farben und Einstellungen anpassen",
         step2DepthSubtitle: "Tiefe diskretisieren",
-        step3Subtitle: "An nächste Pixelfarbe aus verfügbaren Farben angleichen",
+        step3Subtitle: "Bearbeite einzelne Pixel, um dein Mosaik zu perfektionieren",
         step3DepthSubtitle: "Tiefenkarte anpassen",
-        step4Subtitle: "Für verfügbare Teile korrigieren, wenn Teileanzahl begrenzt",
+        step4Subtitle: "Dein fertiges LEGO® Mosaik",
 
         // Navigation buttons
         nextAdjust: "Weiter: Farben anpassen →",
@@ -202,7 +202,7 @@ const translations = {
         piecesUsedInFinalImage: "Im Endbild verwendete Teile",
         dimensions: "Abmessungen",
         numberUsed: "Anzahl verwendet",
-        piecesMissingFromStep3: "Fehlende Teile aus Schritt 3",
+        piecesMissingFromStep3: "Fehlende Teile aus der Farbzuordnung",
         addingPiecesHelp: "Das Hinzufügen dieser Teile ermöglicht es, dass das Endbild dem Vorschaubild entspricht",
         numberMissing: "Anzahl fehlend",
 
