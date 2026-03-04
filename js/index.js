@@ -2817,11 +2817,16 @@ function handleInputImage(e, dontClearDepth, dontLog) {
             }
         };
         inputImage.src = event.target.result;
-        document.getElementById("steps-row").hidden = false;
+        // Show visual step 1 and stepper
+        document.getElementById("visual-step-1").hidden = false;
+        document.getElementById("visual-step-1").classList.add("active");
         document.getElementById("step-navigation").hidden = false;
         document.getElementById("input-image-selector").innerHTML = t('reselectInputImage');
         document.getElementById("image-input-new").appendChild(document.getElementById("image-input"));
         document.getElementById("image-input-card").hidden = true;
+        // Also set old steps-row for backward compat
+        var stepsRow = document.getElementById("steps-row");
+        if (stepsRow) stepsRow.hidden = false;
         var exContainer = document.getElementById("run-example-input-container");
         if (exContainer) exContainer.hidden = true;
         setTimeout(() => {
@@ -2934,55 +2939,65 @@ window.addEventListener("appinstalled", () => {
     perfLoggingDatabase && perfLoggingDatabase.ref("pwa-install-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
 });
 
-// Step Navigation System
-let currentStep = 1;
+// Step Navigation System — 2-step visual flow, 4-step internal pipeline
+let currentVisualStep = 1;
 const stepProcessed = { 1: false, 2: false, 3: false, 4: false };
 
-function goToStep(stepNumber) {
-    // Hide all steps
-    document.querySelectorAll('.step-container').forEach(step => {
-        step.classList.remove('active');
+function showVisualStep(vstep) {
+    // Hide all visual steps
+    document.querySelectorAll('.visual-step').forEach(el => {
+        el.classList.remove('active');
+        el.hidden = true;
     });
-    
-    // Update navigation buttons
-    document.querySelectorAll('.step-nav-btn').forEach(btn => {
-        btn.classList.remove('active');
+
+    // Show target
+    const target = document.getElementById('visual-step-' + vstep);
+    if (target) {
+        target.hidden = false;
+        target.classList.add('active');
+    }
+
+    // Update stepper
+    document.querySelectorAll('.mosaic-stepper-step').forEach(btn => {
+        btn.classList.remove('active', 'completed');
     });
-    
-    // Show the selected step
-    document.getElementById(`step-${stepNumber}`).classList.add('active');
-    document.getElementById(`step-nav-btn-${stepNumber}`).classList.add('active');
-    
-    currentStep = stepNumber;
-    
-    // Run the appropriate step processing if needed
-    runStepProcessing(stepNumber);
+    const btn1 = document.getElementById('vstep-btn-1');
+    const btn2 = document.getElementById('vstep-btn-2');
+    const line = document.getElementById('stepper-line-1');
+
+    if (vstep === 1) {
+        btn1.classList.add('active');
+        line.classList.remove('completed');
+    } else if (vstep === 2) {
+        btn1.classList.add('completed');
+        btn2.classList.add('active');
+        line.classList.add('completed');
+    }
+
+    currentVisualStep = vstep;
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+    // Also tell parent iframe
+    window.parent.postMessage({ type: 'mosaic-resize', height: document.body.scrollHeight }, '*');
 }
 
-function runStepProcessing(stepNumber) {
-    // Run all steps up to and including the target step if they haven't been processed
-    // This ensures dependent data is available
-    
+function runStepProcessing(targetStep, callback) {
     function runStepsSequentially(stepsToRun, index) {
-        if (index >= stepsToRun.length) return;
-        
+        if (index >= stepsToRun.length) {
+            if (callback) callback();
+            return;
+        }
+
         const step = stepsToRun[index];
-        const wasProcessed = stepProcessed[step];
-        
-        if (!wasProcessed) {
-            // Get the step function
+        if (!stepProcessed[step]) {
             const stepFunctions = {
                 1: runStep1Only,
                 2: runStep2Only,
                 3: runStep3Only,
                 4: runStep4Only
             };
-            
-            // Run the step - it will set stepProcessed and call enableInteraction when done
             stepFunctions[step]();
-            
-            // Wait for step to complete before running next
-            // Check stepProcessed flag periodically
             const checkComplete = setInterval(() => {
                 if (stepProcessed[step]) {
                     clearInterval(checkComplete);
@@ -2990,26 +3005,21 @@ function runStepProcessing(stepNumber) {
                 }
             }, 50);
         } else {
-            // Step already processed, move to next
             runStepsSequentially(stepsToRun, index + 1);
         }
     }
-    
-    // Build list of steps that need to run
+
     const stepsToRun = [];
-    for (let i = 1; i <= stepNumber; i++) {
+    for (let i = 1; i <= targetStep; i++) {
         if (!stepProcessed[i]) {
             stepsToRun.push(i);
         }
     }
-    
-    // If the target step is already processed but was re-requested, add it
-    if (stepsToRun.length === 0 || stepsToRun[stepsToRun.length - 1] !== stepNumber) {
-        // Target step is already processed, no need to re-run
-    }
-    
+
     if (stepsToRun.length > 0) {
         runStepsSequentially(stepsToRun, 0);
+    } else {
+        if (callback) callback();
     }
 }
 
@@ -3019,27 +3029,46 @@ function invalidateStepsFrom(stepNumber) {
     }
 }
 
-// Set up navigation button click handlers
-document.querySelectorAll('.step-nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const stepNumber = parseInt(btn.dataset.step);
-        goToStep(stepNumber);
+// "Create Mosaic" button — runs all 4 internal steps, then shows visual step 2
+var createMosaicBtn = document.getElementById('create-mosaic-btn');
+if (createMosaicBtn) {
+    createMosaicBtn.addEventListener('click', function() {
+        // Invalidate and re-run full pipeline
+        invalidateStepsFrom(1);
+        runStepProcessing(4, function() {
+            showVisualStep(2);
+        });
+    });
+}
+
+// "Back to Settings" button
+var backBtn = document.getElementById('back-to-step1-btn');
+if (backBtn) {
+    backBtn.addEventListener('click', function() {
+        showVisualStep(1);
+    });
+}
+
+// Stepper click handlers
+document.querySelectorAll('.mosaic-stepper-step').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const vstep = parseInt(this.dataset.vstep);
+        if (vstep === 1) {
+            showVisualStep(1);
+        } else if (vstep === 2 && stepProcessed[4]) {
+            showVisualStep(2);
+        }
     });
 });
 
-// Set up next/prev button handlers
-document.querySelectorAll('.step-next-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const nextStep = parseInt(btn.dataset.nextStep);
-        goToStep(nextStep);
-    });
-});
-
-document.querySelectorAll('.step-prev-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const prevStep = parseInt(btn.dataset.prevStep);
-        goToStep(prevStep);
-    });
-});
+// Legacy goToStep for backward compat (some internal code might call it)
+function goToStep(stepNumber) {
+    // Map old steps to new visual steps
+    if (stepNumber <= 3) {
+        showVisualStep(1);
+    } else {
+        showVisualStep(2);
+    }
+}
 
 enableInteraction(); // enable interaction once everything has loaded in
