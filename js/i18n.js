@@ -4,9 +4,16 @@ const translations = {
         // Page title and header
         pageTitle: "BRICKONAS Mosaik Konfigurator",
 
-        // Step navigation (new 2-step flow)
+        // Step navigation (3-step visual flow)
+        stepperConfigure: "Anpassen",
+        stepperResult: "Ergebnis",
         step1Label: "Bild & Einstellungen",
         step2Label: "Dein Mosaik",
+        nextRefine: "Weiter: Farben verfeinern \u2192",
+        nextOutput: "Weiter: Ergebnis \u2192",
+        backConfigure: "\u2190 Zurück: Anpassen",
+        backRefine: "\u2190 Zurück: Farben verfeinern",
+        refineColorsSubtitle: "Bearbeite einzelne Pixel mit dem Pinsel, um dein Mosaik zu perfektionieren",
 
         // Old step references (kept for backward compat in processing code)
         step1Crop: "Schritt 1: Zuschneiden",

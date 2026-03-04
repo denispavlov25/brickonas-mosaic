@@ -250,14 +250,15 @@
         background: var(--bk-light-gray);
         border-radius: var(--bk-radius-md);
         padding: 12px;
-        min-height: 200px;
+        min-height: 120px;
         display: flex;
         align-items: center;
         justify-content: center;
       }
 
       .mosaic-canvas-area canvas {
-        width: 100%;
+        max-width: 100%;
+        height: auto;
         display: block;
         border-radius: var(--bk-radius-sm);
       }
@@ -667,23 +668,33 @@
         overflow: hidden;
       }
 
-      /* === LOADING OVERLAY === */
+      /* === LOADING OVERLAY (shows after 1s delay) === */
       #loading-overlay {
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.4);
+        background-color: transparent;
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 9999;
+        pointer-events: none;
       }
 
       #loading-overlay.hidden { display: none; }
 
+      #loading-overlay .spinner {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      #loading-overlay.show-spinner .spinner {
+        opacity: 1;
+      }
+
       .spinner {
-        width: 52px; height: 52px;
-        border: 5px solid rgba(255, 255, 255, 0.3);
+        width: 40px; height: 40px;
+        border: 4px solid rgba(46, 125, 50, 0.2);
         border-top-color: var(--bk-green-primary);
         border-radius: 50%;
         animation: spinner-rotate 0.8s linear infinite;
@@ -738,11 +749,15 @@
       <div class="mosaic-stepper" id="step-navigation" hidden>
         <div class="mosaic-stepper-step active" data-vstep="1" id="vstep-btn-1">
           <div class="stepper-circle">1</div>
-          <div class="stepper-label">Anpassen</div>
+          <div class="stepper-label" data-i18n="stepperConfigure">Anpassen</div>
         </div>
         <div class="mosaic-stepper-step" data-vstep="2" id="vstep-btn-2">
           <div class="stepper-circle">2</div>
-          <div class="stepper-label">Ergebnis</div>
+          <div class="stepper-label" data-i18n="refineColors">Farben verfeinern</div>
+        </div>
+        <div class="mosaic-stepper-step" data-vstep="3" id="vstep-btn-3">
+          <div class="stepper-circle">3</div>
+          <div class="stepper-label" data-i18n="stepperResult">Ergebnis</div>
         </div>
       </div>
 
@@ -807,7 +822,7 @@
                   <!-- Canvas Area (left) -->
                   <div>
                     <div class="mosaic-canvas-area">
-                      <canvas id="step-1-canvas-upscaled" style="width: 100%" class="cropper-img"></canvas>
+                      <canvas id="step-1-canvas-upscaled" style="" class="cropper-img"></canvas>
                     </div>
                     <div id="image-input-new"></div>
                   </div>
@@ -852,41 +867,10 @@
                       </div>
                     </div>
 
-                    <!-- Pixel Piece -->
-                    <div class="mosaic-control-section">
-                      <button class="mosaic-control-header collapsed" data-toggle="collapse" data-target="#ctrl-pixel-piece" aria-expanded="false" data-i18n="pixelPiece">Pixel-Teil</button>
-                      <div id="ctrl-pixel-piece" class="collapse">
-                        <div class="mosaic-control-body">
-                          <div class="btn-group">
-                            <button class="btn dropdown-toggle btn-outline-dark" type="button" id="bricklink-piece-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Bricklink Pixel Piece</button>
-                            <div class="dropdown-menu" id="bricklink-piece-options" aria-labelledby="stud-map-button"></div>
-                          </div>
-                          <div id="pixel-dimensions-container-wrapper" hidden style="margin-top: 8px">
-                            <small><p style="margin-bottom: 8px"><b>Wichtig</b>: Variabler Pixeltyp gewählt, 'Unendliche Teileanzahl' wurde aktiviert</p></small>
-                            <b>Verfügbare Dimensionen:</b>
-                            <div id="pixel-dimensions-container"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Interpolation -->
-                    <div class="mosaic-control-section">
-                      <button class="mosaic-control-header collapsed" data-toggle="collapse" data-target="#ctrl-interpolation" aria-expanded="false" data-i18n="interpolation">Interpolation</button>
-                      <div id="ctrl-interpolation" class="collapse">
-                        <div class="mosaic-control-body">
-                          <small style="color: var(--bk-medium-gray);" data-i18n="interpolationHelp">Diese Einstellung bestimmt, welcher Algorithmus verwendet wird, um das Bild auf die Zielauflösung zu skalieren</small>
-                          <div class="btn-group" style="margin-top: 8px;">
-                            <button class="btn dropdown-toggle btn-outline-dark" type="button" id="interpolation-algorithm-button" data-toggle="dropdown" data-i18n="browserDefault">Browser-Standard</button>
-                            <div class="dropdown-menu" id="interpolation-algorithm-options"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                <!-- Depth Map elements (hidden, kept for JS) -->
+                <!-- Hidden elements kept for JS compatibility -->
                 <div style="display:none;">
                   <canvas id="web-worker-input-canvas"></canvas>
                   <canvas id="web-worker-output-canvas"></canvas>
@@ -896,169 +880,43 @@
                   <button id="input-depth-image-selector"></button>
                   <button id="generate-depth-image"></button>
                   <h5 id="web-worker-loading-message"></h5>
+                  <!-- Pixel piece (hidden, kept for JS) -->
+                  <button id="bricklink-piece-button" data-toggle="dropdown"></button>
+                  <div class="dropdown-menu" id="bricklink-piece-options"></div>
+                  <div id="pixel-dimensions-container-wrapper" hidden><div id="pixel-dimensions-container"></div></div>
+                  <!-- Interpolation (hidden, kept for JS) -->
+                  <button id="interpolation-algorithm-button" data-toggle="dropdown"></button>
+                  <div class="dropdown-menu" id="interpolation-algorithm-options"></div>
+                  <div id="color-ties-resolution-section"></div>
                 </div>
 
-                <!-- Advanced: Color Adjustment -->
-                <div class="mosaic-advanced-section">
-                  <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-color-adjust" aria-expanded="false">
-                    <span class="mosaic-advanced-icon">&#x2699;</span>
-                    <span data-i18n="colorAdjustment">Farbanpassung</span>
-                    <span class="mosaic-advanced-chevron">&#x25B8;</span>
-                  </button>
-                  <div id="adv-color-adjust" class="collapse">
-                    <div class="mosaic-advanced-body">
-                      <!-- HSV -->
-                      <div>
-                        <div class="mosaic-slider-label"><span data-i18n="hueAdjustment">Farbton:</span> <span id="hue-text">0&#176;</span></div>
-                        <div class="mosaic-slider-row">
-                          <button class="btn btn-sm" id="hue-decrement">-</button>
-                          <input type="range" id="hue-slider" min="-180" max="180" />
-                          <button class="btn btn-sm" id="hue-increment">+</button>
-                        </div>
-                      </div>
-                      <div>
-                        <div class="mosaic-slider-label"><span data-i18n="saturationAdjustment">Sättigung:</span> <span id="saturation-text">0%</span></div>
-                        <div class="mosaic-slider-row">
-                          <button class="btn btn-sm" id="saturation-decrement">-</button>
-                          <input type="range" id="saturation-slider" min="-100" max="100" />
-                          <button class="btn btn-sm" id="saturation-increment">+</button>
-                        </div>
-                      </div>
-                      <div>
-                        <div class="mosaic-slider-label"><span data-i18n="valueAdjustment">Wert:</span> <span id="value-text">0%</span></div>
-                        <div class="mosaic-slider-row">
-                          <button class="btn btn-sm" id="value-decrement">-</button>
-                          <input type="range" id="value-slider" min="-100" max="100" />
-                          <button class="btn btn-sm" id="value-increment">+</button>
-                        </div>
-                      </div>
-                      <button class="mosaic-action-btn warning" type="button" id="reset-hsv-button" data-i18n="resetHSV">HSV zurücksetzen</button>
-
-                      <hr style="border-color: var(--bk-gray); margin: 12px 0;">
-
-                      <!-- Brightness -->
-                      <div>
-                        <div class="mosaic-slider-label"><span data-i18n="brightnessAdjustment">Helligkeit:</span> <span id="brightness-text">0</span></div>
-                        <div class="mosaic-slider-row">
-                          <button class="btn btn-sm" id="brightness-decrement">-</button>
-                          <input type="range" id="brightness-slider" min="-128" max="128" />
-                          <button class="btn btn-sm" id="brightness-increment">+</button>
-                        </div>
-                        <button class="mosaic-action-btn warning" type="button" id="reset-brightness-button" data-i18n="resetBrightness">Helligkeit zurücksetzen</button>
-                      </div>
-
-                      <!-- Contrast -->
-                      <div>
-                        <div class="mosaic-slider-label"><span data-i18n="contrastAdjustment">Kontrast:</span> <span id="contrast-text">0</span></div>
-                        <div class="mosaic-slider-row">
-                          <button class="btn btn-sm" id="contrast-decrement">-</button>
-                          <input type="range" id="contrast-slider" min="-128" max="128" />
-                          <button class="btn btn-sm" id="contrast-increment">+</button>
-                        </div>
-                        <button class="mosaic-action-btn warning" type="button" id="reset-contrast-button" data-i18n="resetContrast">Kontrast zurücksetzen</button>
-                      </div>
-                    </div>
-                  </div>
+                <!-- Color Adjustment controls (hidden, kept for JS) -->
+                <div style="display:none;">
+                  <input type="range" id="hue-slider" min="-180" max="180" value="0" />
+                  <span id="hue-text">0</span>
+                  <button id="hue-decrement">-</button>
+                  <button id="hue-increment">+</button>
+                  <input type="range" id="saturation-slider" min="-100" max="100" value="0" />
+                  <span id="saturation-text">0%</span>
+                  <button id="saturation-decrement">-</button>
+                  <button id="saturation-increment">+</button>
+                  <input type="range" id="value-slider" min="-100" max="100" value="0" />
+                  <span id="value-text">0%</span>
+                  <button id="value-decrement">-</button>
+                  <button id="value-increment">+</button>
+                  <button id="reset-hsv-button">Reset HSV</button>
+                  <input type="range" id="brightness-slider" min="-128" max="128" value="0" />
+                  <span id="brightness-text">0</span>
+                  <button id="brightness-decrement">-</button>
+                  <button id="brightness-increment">+</button>
+                  <button id="reset-brightness-button">Reset</button>
+                  <input type="range" id="contrast-slider" min="-128" max="128" value="0" />
+                  <span id="contrast-text">0</span>
+                  <button id="contrast-decrement">-</button>
+                  <button id="contrast-increment">+</button>
+                  <button id="reset-contrast-button">Reset</button>
                 </div>
 
-                <!-- Advanced: Available Colors -->
-                <div class="mosaic-advanced-section">
-                  <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-colors" aria-expanded="false">
-                    <span class="mosaic-advanced-icon">&#x2699;</span>
-                    <span data-i18n="availableColors">Verfügbare Farben</span>
-                    <span class="mosaic-advanced-chevron">&#x25B8;</span>
-                  </button>
-                  <div id="adv-colors" class="collapse">
-                    <div class="mosaic-advanced-body">
-                      <div id="custom-stud-map-controls">
-                        <div style="margin-bottom: 12px;">
-                          <small>
-                            <p style="margin-bottom: 4px" data-i18n="availableColorsHelp1">In diesem Abschnitt wird angegeben, wie viele Teile jeder Farbe Sie zur Verfügung haben</p>
-                            <p style="margin-bottom: 4px" data-i18n="availableColorsHelp3">Der Algorithmus kann nur ausgeführt werden, wenn Sie genügend Teile ausgewählt haben</p>
-                          </small>
-                          <div class="mosaic-piece-stats" style="margin-top: 8px;">
-                            <div class="mosaic-piece-stat">
-                              <div class="stat-value" id="required-studs">0</div>
-                              <div class="stat-label" data-i18n="requiredPieces">Erforderlich</div>
-                            </div>
-                            <div class="mosaic-piece-stat">
-                              <div class="stat-value" id="available-studs">0</div>
-                              <div class="stat-label" data-i18n="availablePieces">Verfügbar</div>
-                            </div>
-                            <div class="mosaic-piece-stat">
-                              <div class="stat-value" id="missing-studs">0</div>
-                              <div class="stat-label" data-i18n="missingPiecesLabel">Fehlend</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div style="padding-bottom: 10px">
-                          <button class="mosaic-action-btn warning" type="button" id="clear-custom-studs-button" data-i18n="clearAvailablePieces">Verfügbare Teile löschen</button>
-                        </div>
-                        <div class="mosaic-checkbox" id="infinite-piece-count-check-container">
-                          <input type="checkbox" class="checkbox-clickable" id="infinite-piece-count-check" />
-                          <span data-i18n="infinitePieceCounts">Unendliche Teileanzahl</span>
-                        </div>
-                        <div id="forced-infinite-piece-count-warning" hidden>
-                          <small><p data-i18n="infinitePieceCountsWarning"><b>Wichtig</b>: Unendliche Teileanzahlen wurden verwendet</p></small>
-                        </div>
-                        <div><small><p data-i18n="paintbrushNote"><b>Hinweis</b>: Alle mit dem Pinsel gemalten Farben werden als vorhanden angenommen</p></small></div>
-                        <table class="table">
-                          <thead>
-                            <tr>
-                              <th scope="col" data-i18n="color">Farbe</th>
-                              <th scope="col" data-i18n="numberAvailable">Anzahl verfügbar</th>
-                            </tr>
-                          </thead>
-                          <tbody id="custom-stud-table-body"></tbody>
-                        </table>
-                        <div style="padding-bottom: 10px">
-                          <button class="mosaic-action-btn primary" id="add-custom-stud-button" data-i18n="addStud">+ Noppe hinzufügen</button>
-                        </div>
-                        <div style="padding-bottom: 10px">
-                          <a id="export-stud-map-button" download="selected-studs.json" href="">
-                            <button class="mosaic-action-btn info" type="button" data-i18n="exportSelectedStuds">Ausgewählte Noppen exportieren</button>
-                          </a>
-                        </div>
-                        <div class="btn-group">
-                          <button class="btn dropdown-toggle btn-outline-dark btn-sm" type="button" id="mix-in-stud-map-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-i18n="mixInStuds">Noppen aus vorhandenem Set mischen</button>
-                          <div class="dropdown-menu" id="mix-in-stud-map-options" aria-labelledby="mix-in-stud-map-button"></div>
-                          <input type="file" id="import-stud-map-file-input" name="import-stud-map-file-input" hidden />
-                        </div>
-                        <div style="margin-top: 4px"><small><b data-i18n="mixedInStudsNote">Gemischte Noppen werden zu bereits ausgewählten Noppen hinzugefügt</b></small></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Advanced: Refine Colors (Paintbrush) -->
-                <div class="mosaic-advanced-section">
-                  <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-refine" aria-expanded="false">
-                    <span class="mosaic-advanced-icon">&#x2699;</span>
-                    <span data-i18n="refineColors">Farben verfeinern</span>
-                    <span class="mosaic-advanced-chevron">&#x25B8;</span>
-                  </button>
-                  <div id="adv-refine" class="collapse">
-                    <div class="mosaic-advanced-body">
-                      <small style="color: var(--bk-medium-gray);">Pinsel-Werkzeuge zum manuellen Bearbeiten einzelner Pixel nach Erstellung des Mosaiks.</small>
-                      <div class="mosaic-tools-bar">
-                        <div class="btn-group">
-                          <button class="btn dropdown-toggle paintbrush-controls-button" type="button" id="paintbrush-tool-selection-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <svg width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16"><path d="M15.825.12a.5.5 0 0 1 .132.584c-1.53 3.43-4.743 8.17-7.095 10.64a6.067 6.067 0 0 1-2.373 1.534c-.018.227-.06.538-.16.868-.201.659-.667 1.479-1.708 1.74a8.118 8.118 0 0 1-3.078.132 3.659 3.659 0 0 1-.562-.135 1.382 1.382 0 0 1-.466-.247.714.714 0 0 1-.204-.288.622.622 0 0 1 .004-.443c.095-.245.316-.38.461-.452.394-.197.625-.453.867-.826.095-.144.184-.297.287-.472l.117-.198c.151-.255.326-.54.546-.848.528-.739 1.201-.925 1.746-.896.126.007.243.025.348.048.062-.172.142-.38.238-.608.261-.619.658-1.419 1.187-2.069 2.176-2.67 6.18-6.206 9.117-8.104a.5.5 0 0 1 .596.04z"/></svg>
-                          </button>
-                          <div class="dropdown-menu" id="paintbrush-tool-selection-dropdown-options">
-                            <a class="dropdown-item btn" id="paintbrush-tool-dropdown-option"><span data-i18n="paintbrush">Pinsel</span></a>
-                            <a class="dropdown-item btn" id="eraser-tool-dropdown-option"><span data-i18n="eraser">Radierer</span></a>
-                            <a class="dropdown-item btn" id="dropdown-tool-dropdown-option"><span data-i18n="dropper">Pipette</span></a>
-                          </div>
-                        </div>
-                        <span id="paintbrush-controls"> </span>
-                        <button class="btn paintbrush-controls-button" type="button" id="clear-overrides-button" data-toggle="tooltip" title="Alle Pinseländerungen löschen" data-placement="top">
-                          <svg width="16" height="16" fill="currentColor" class="bi bi-trash-fill" viewBox="0 0 16 16"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
               </div>
 
@@ -1068,15 +926,115 @@
 
             <div class="mosaic-nav-buttons">
               <div></div>
-              <button class="btn-next" type="button" id="create-mosaic-btn" data-i18n="nextOutput">Mosaik erstellen &#x2192;</button>
+              <button class="btn-next" type="button" id="create-mosaic-btn" data-i18n="nextRefine">Weiter: Farben verfeinern &#x2192;</button>
             </div>
           </div>
         </div>
 
         <!-- ==========================================
-             VISUAL STEP 2: RESULT
+             VISUAL STEP 2: FARBEN VERFEINERN (Refine Colors)
              ========================================== -->
         <div id="visual-step-2" class="visual-step" hidden>
+          <div class="mosaic-card">
+            <div class="mosaic-step-title" data-i18n="refineColors">Farben verfeinern</div>
+            <div class="mosaic-step-subtitle" data-i18n="refineColorsSubtitle">Bearbeite einzelne Pixel mit dem Pinsel, um dein Mosaik zu perfektionieren</div>
+
+            <!-- Canvas with pixelated mosaic -->
+            <div class="mosaic-canvas-area" style="margin-bottom: 16px;">
+              <canvas id="step-3-canvas" hidden></canvas>
+              <canvas id="step-3-canvas-upscaled" style=""></canvas>
+            </div>
+
+            <!-- Paintbrush Tools -->
+            <div class="mosaic-tools-bar">
+              <div class="btn-group">
+                <button class="btn dropdown-toggle paintbrush-controls-button" type="button" id="paintbrush-tool-selection-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.825.12a.5.5 0 0 1 .132.584c-1.53 3.43-4.743 8.17-7.095 10.64a6.067 6.067 0 0 1-2.373 1.534c-.018.227-.06.538-.16.868-.201.659-.667 1.479-1.708 1.74a8.118 8.118 0 0 1-3.078.132 3.659 3.659 0 0 1-.562-.135 1.382 1.382 0 0 1-.466-.247.714.714 0 0 1-.204-.288.622.622 0 0 1 .004-.443c.095-.245.316-.38.461-.452.394-.197.625-.453.867-.826.095-.144.184-.297.287-.472l.117-.198c.151-.255.326-.54.546-.848.528-.739 1.201-.925 1.746-.896.126.007.243.025.348.048.062-.172.142-.38.238-.608.261-.619.658-1.419 1.187-2.069 2.176-2.67 6.18-6.206 9.117-8.104a.5.5 0 0 1 .596.04z"/></svg>
+                </button>
+                <div class="dropdown-menu" id="paintbrush-tool-selection-dropdown-options">
+                  <a class="dropdown-item btn" id="paintbrush-tool-dropdown-option"><span data-i18n="paintbrush">Pinsel</span></a>
+                  <a class="dropdown-item btn" id="eraser-tool-dropdown-option"><span data-i18n="eraser">Radierer</span></a>
+                  <a class="dropdown-item btn" id="dropdown-tool-dropdown-option"><span data-i18n="dropper">Pipette</span></a>
+                </div>
+              </div>
+              <span id="paintbrush-controls"> </span>
+              <button class="btn paintbrush-controls-button" type="button" id="clear-overrides-button" data-toggle="tooltip" title="Alle Pinseländerungen löschen" data-placement="top">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/></svg>
+              </button>
+            </div>
+
+            <!-- Piece Stats & Available Colors -->
+            <div id="custom-stud-map-controls">
+              <div class="mosaic-piece-stats">
+                <div class="mosaic-piece-stat">
+                  <div class="stat-value" id="required-studs">0</div>
+                  <div class="stat-label" data-i18n="requiredPieces">Erforderlich</div>
+                </div>
+                <div class="mosaic-piece-stat">
+                  <div class="stat-value" id="available-studs">0</div>
+                  <div class="stat-label" data-i18n="availablePieces">Verfügbar</div>
+                </div>
+                <div class="mosaic-piece-stat">
+                  <div class="stat-value" id="missing-studs">0</div>
+                  <div class="stat-label" data-i18n="missingPiecesLabel">Fehlend</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Advanced: Available Colors -->
+            <div class="mosaic-advanced-section">
+              <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-colors" aria-expanded="false">
+                <span class="mosaic-advanced-icon">&#x2699;</span>
+                <span data-i18n="availableColors">Verfügbare Farben</span>
+                <span class="mosaic-advanced-chevron">&#x25B8;</span>
+              </button>
+              <div id="adv-colors" class="collapse">
+                <div class="mosaic-advanced-body">
+                  <div class="mosaic-checkbox" id="infinite-piece-count-check-container">
+                    <input type="checkbox" class="checkbox-clickable" id="infinite-piece-count-check" />
+                    <span data-i18n="infinitePieceCounts">Unendliche Teileanzahl</span>
+                  </div>
+                  <div id="forced-infinite-piece-count-warning" hidden>
+                    <small><p data-i18n="infinitePieceCountsWarning"><b>Wichtig</b>: Unendliche Teileanzahlen wurden verwendet</p></small>
+                  </div>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th scope="col" data-i18n="color">Farbe</th>
+                        <th scope="col" data-i18n="numberAvailable">Anzahl verfügbar</th>
+                      </tr>
+                    </thead>
+                    <tbody id="custom-stud-table-body"></tbody>
+                  </table>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="mosaic-action-btn primary" id="add-custom-stud-button" data-i18n="addStud">+ Noppe hinzufügen</button>
+                    <button class="mosaic-action-btn warning" type="button" id="clear-custom-studs-button" data-i18n="clearAvailablePieces">Alle löschen</button>
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                    <a id="export-stud-map-button" download="selected-studs.json" href="">
+                      <button class="mosaic-action-btn info" type="button" data-i18n="exportSelectedStuds">Exportieren</button>
+                    </a>
+                    <div class="btn-group">
+                      <button class="btn dropdown-toggle btn-outline-dark btn-sm" type="button" id="mix-in-stud-map-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-i18n="mixInStuds">Set hinzufügen</button>
+                      <div class="dropdown-menu" id="mix-in-stud-map-options" aria-labelledby="mix-in-stud-map-button"></div>
+                      <input type="file" id="import-stud-map-file-input" name="import-stud-map-file-input" hidden />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mosaic-nav-buttons">
+              <button class="btn-back" type="button" id="back-to-step1-btn" data-i18n="backConfigure">&#x2190; Zurück: Anpassen</button>
+              <button class="btn-next" type="button" id="go-to-result-btn" data-i18n="nextOutput">Weiter: Ergebnis &#x2192;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==========================================
+             VISUAL STEP 3: RESULT
+             ========================================== -->
+        <div id="visual-step-3" class="visual-step" hidden>
           <div class="mosaic-card">
             <div class="mosaic-step-title" data-i18n="step4Header">Ergebnis</div>
             <div class="mosaic-step-subtitle" data-i18n="step4Subtitle">Dein fertiges LEGO Mosaik</div>
@@ -1094,7 +1052,7 @@
                 <div class="mosaic-canvas-area" style="margin-bottom: 0;">
                   <canvas id="step-4-canvas" hidden></canvas>
                   <canvas id="bricklink-cache-canvas" hidden></canvas>
-                  <canvas id="step-4-canvas-upscaled" style="width: 100%"></canvas>
+                  <canvas id="step-4-canvas-upscaled" style=""></canvas>
                 </div>
 
                 <!-- PDF Download Button -->
@@ -1180,7 +1138,7 @@
 
               <!-- Depth/3D tab -->
               <div class="tab-pane fade show" id="step-4-depth-tab-content" role="tabpanel">
-                <div id="step-4-canvas-3d-upscaled" style="width: 100%"></div>
+                <div id="step-4-canvas-3d-upscaled" style=""></div>
                 <div id="step-4-depth-accordion" style="margin-top: 12px;">
                   <div class="mosaic-control-section">
                     <button class="mosaic-control-header collapsed" data-toggle="collapse" data-target="#depth-3d-settings" aria-expanded="false">3D Vorschau</button>
@@ -1218,7 +1176,7 @@
             </div>
 
             <div class="mosaic-nav-buttons">
-              <button class="btn-back" type="button" id="back-to-step1-btn" data-i18n="backConfigure">&#x2190; Zurück: Anpassen</button>
+              <button class="btn-back" type="button" id="back-to-refine-btn" data-i18n="backRefine">&#x2190; Zurück: Farben verfeinern</button>
               <div></div>
             </div>
           </div>
@@ -1238,9 +1196,7 @@
             <div id="depth-threshold-sliders-containers" hidden><input type="range" min="0" max="255" value="128" /></div>
           </div>
 
-          <!-- Step 3 internal canvases -->
-          <canvas id="step-3-canvas" hidden></canvas>
-          <canvas id="step-3-canvas-upscaled" hidden></canvas>
+          <!-- Step 3 canvases are in visual-step-2 -->
           <div id="step-3-color-tab-content"></div>
           <div id="step-3-depth-tab-content">
             <canvas id="step-3-depth-canvas" hidden></canvas>
