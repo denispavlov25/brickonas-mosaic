@@ -4,7 +4,7 @@ const translations = {
         // Page title and header
         pageTitle: "BRICKONAS Mosaik Konfigurator",
 
-        // Step navigation (3-step visual flow)
+        // Step navigation (2-step visual flow)
         stepperConfigure: "Anpassen",
         stepperResult: "Ergebnis",
         step1Label: "Bild & Einstellungen",

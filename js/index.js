@@ -2953,9 +2953,9 @@ window.addEventListener("appinstalled", () => {
     perfLoggingDatabase && perfLoggingDatabase.ref("pwa-install-count/per-day/" + loggingTimestamp).transaction(incrementTransaction);
 });
 
-// Step Navigation System — 3-step visual flow, 4-step internal pipeline
-// Visual Step 1 = Configure (internal steps 1)
-// Visual Step 2 = Farben verfeinern (internal steps 2+3)
+// Step Navigation System — 2-step visual flow, 4-step internal pipeline
+// Visual Step 1 = Configure (internal step 1)
+// Visual Step 2 = Farben verfeinern (HIDDEN — internal steps 2+3 still run)
 // Visual Step 3 = Result (internal step 4)
 let currentVisualStep = 1;
 const stepProcessed = { 1: false, 2: false, 3: false, 4: false };
@@ -2984,12 +2984,8 @@ function showVisualStep(vstep) {
 
     if (vstep === 1) {
         if (btn1) btn1.classList.add('active');
-    } else if (vstep === 2) {
-        if (btn1) btn1.classList.add('completed');
-        if (btn2) btn2.classList.add('active');
     } else if (vstep === 3) {
         if (btn1) btn1.classList.add('completed');
-        if (btn2) btn2.classList.add('completed');
         if (btn3) btn3.classList.add('active');
     }
 
@@ -3048,40 +3044,22 @@ function invalidateStepsFrom(stepNumber) {
     }
 }
 
-// Step 1 → Step 2: "Weiter: Farben verfeinern" — runs internal steps 1-3, shows refine step
+// Step 1 → Result: "Weiter: Ergebnis" — runs all internal steps 1-4, shows result
 var createMosaicBtn = document.getElementById('create-mosaic-btn');
 if (createMosaicBtn) {
     createMosaicBtn.addEventListener('click', function() {
         invalidateStepsFrom(1);
-        runStepProcessing(3, function() {
-            showVisualStep(2);
-        });
-    });
-}
-
-// Step 2 → Step 3: "Weiter: Ergebnis" — runs internal step 4
-var goToResultBtn = document.getElementById('go-to-result-btn');
-if (goToResultBtn) {
-    goToResultBtn.addEventListener('click', function() {
         runStepProcessing(4, function() {
             showVisualStep(3);
         });
     });
 }
 
-// Step 2 → Step 1: "Zurück: Anpassen"
-var backToStep1Btn = document.getElementById('back-to-step1-btn');
-if (backToStep1Btn) {
-    backToStep1Btn.addEventListener('click', function() {
-        showVisualStep(1);
-    });
-}
-
-// Step 3 → Step 2: "Zurück: Farben verfeinern"
+// Result → Step 1: "Zurück: Anpassen"
 var backToRefineBtn = document.getElementById('back-to-refine-btn');
 if (backToRefineBtn) {
     backToRefineBtn.addEventListener('click', function() {
-        showVisualStep(2);
+        showVisualStep(1);
     });
 }
 
@@ -3091,8 +3069,6 @@ document.querySelectorAll('.mosaic-stepper-step').forEach(function(btn) {
         var vstep = parseInt(this.dataset.vstep);
         if (vstep === 1) {
             showVisualStep(1);
-        } else if (vstep === 2 && stepProcessed[3]) {
-            showVisualStep(2);
         } else if (vstep === 3 && stepProcessed[4]) {
             showVisualStep(3);
         }
@@ -3101,10 +3077,8 @@ document.querySelectorAll('.mosaic-stepper-step').forEach(function(btn) {
 
 // Legacy goToStep for backward compat (internal code may call it)
 function goToStep(stepNumber) {
-    if (stepNumber <= 1) {
+    if (stepNumber <= 3) {
         showVisualStep(1);
-    } else if (stepNumber <= 3) {
-        showVisualStep(2);
     } else {
         showVisualStep(3);
     }

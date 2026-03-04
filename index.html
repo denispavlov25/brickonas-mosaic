@@ -751,12 +751,9 @@
           <div class="stepper-circle">1</div>
           <div class="stepper-label" data-i18n="stepperConfigure">Anpassen</div>
         </div>
-        <div class="mosaic-stepper-step" data-vstep="2" id="vstep-btn-2">
-          <div class="stepper-circle">2</div>
-          <div class="stepper-label" data-i18n="refineColors">Farben verfeinern</div>
-        </div>
+        <div class="mosaic-stepper-step" data-vstep="2" id="vstep-btn-2" hidden></div>
         <div class="mosaic-stepper-step" data-vstep="3" id="vstep-btn-3">
-          <div class="stepper-circle">3</div>
+          <div class="stepper-circle">2</div>
           <div class="stepper-label" data-i18n="stepperResult">Ergebnis</div>
         </div>
       </div>
@@ -926,7 +923,7 @@
 
             <div class="mosaic-nav-buttons">
               <div></div>
-              <button class="btn-next" type="button" id="create-mosaic-btn" data-i18n="nextRefine">Weiter: Farben verfeinern &#x2192;</button>
+              <button class="btn-next" type="button" id="create-mosaic-btn" data-i18n="nextOutput">Weiter: Ergebnis &#x2192;</button>
             </div>
           </div>
         </div>
@@ -1118,20 +1115,9 @@
                   </div>
                 </div>
 
-                <!-- Advanced: BrickLink -->
-                <div class="mosaic-advanced-section">
-                  <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-bricklink" aria-expanded="false">
-                    <span class="mosaic-advanced-icon">&#x2699;</span>
-                    <span>BrickLink</span>
-                    <span class="mosaic-advanced-chevron">&#x25B8;</span>
-                  </button>
-                  <div id="adv-bricklink" class="collapse">
-                    <div class="mosaic-advanced-body">
-                      <button type="button" id="export-depth-to-bricklink-button" class="mosaic-action-btn info" disabled style="margin-bottom: 8px;" data-i18n="copyBricklinkXML">Bricklink XML kopieren</button>
-                      <small style="display: block;"><a href="https://www.bricklink.com/v2/wanted/upload.page" target="_blank" data-i18n="bricklinkUploadPage">Bricklink Upload-Seite</a></small>
-                      <small style="display: block;"><a href="https://www.lego.com/en-us/page/static/pick-a-brick" target="_blank" data-i18n="usPickABrickPage">U.S. Pick a Brick Seite</a></small>
-                    </div>
-                  </div>
+                <!-- BrickLink export (hidden, kept for JS) -->
+                <div hidden>
+                  <button type="button" id="export-depth-to-bricklink-button" disabled>Bricklink XML kopieren</button>
                 </div>
 
               </div>
@@ -1176,7 +1162,7 @@
             </div>
 
             <div class="mosaic-nav-buttons">
-              <button class="btn-back" type="button" id="back-to-refine-btn" data-i18n="backRefine">&#x2190; Zurück: Farben verfeinern</button>
+              <button class="btn-back" type="button" id="back-to-refine-btn" data-i18n="backConfigure">&#x2190; Zurück: Anpassen</button>
               <div></div>
             </div>
           </div>
