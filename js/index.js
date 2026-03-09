@@ -183,7 +183,7 @@ function initializeCropper() {
     }
     inputImageCropper = new Cropper(step1CanvasUpscaled, {
         aspectRatio: targetResolution[0] / targetResolution[1],
-        viewMode: 3,
+        viewMode: 1,
         minContainerWidth: 1,
         minContainerHeight: 1,
         zoomable: false,
@@ -330,6 +330,7 @@ function handleResolutionChange() {
     $('[data-toggle="tooltip"]').tooltip("dispose");
     $('[data-toggle="tooltip"]').tooltip();
     initializeCropper();
+    if (typeof updateMosaicProductMeta === 'function') updateMosaicProductMeta();
     runStep1();
 }
 
@@ -421,11 +422,20 @@ document.getElementById("height-step-select").addEventListener("change", () => {
 
 document.getElementById("clear-overrides-button").addEventListener("click", () => {
     overridePixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
-    runStep2();
+    // Overrides only affect step 3, so run step 3 directly (step 2 canvas is still valid)
+    if (stepProcessed[2]) {
+        runStep3();
+    } else {
+        runStep2();
+    }
 });
 document.getElementById("clear-depth-overrides-button").addEventListener("click", () => {
     overrideDepthPixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
-    runStep2();
+    if (stepProcessed[2]) {
+        runStep3();
+    } else {
+        runStep2();
+    }
 });
 
 let DEFAULT_STUD_MAP = "all_tile_colors";
@@ -842,6 +852,10 @@ function runCustomStudMap(skipStep1) {
     }
     if (!skipStep1) {
         runStep1();
+    }
+    // If on visual step 2 (painting canvas visible), re-run step 3 with new stud map
+    if (typeof currentVisualStep !== 'undefined' && currentVisualStep === 2 && stepProcessed[2]) {
+        runStep3();
     }
 }
 
@@ -1362,7 +1376,6 @@ function runStep2() {
 
     setTimeout(() => {
         stepProcessed[2] = true;
-        enableInteraction();
         step2CanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
         step2CanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
         step2CanvasUpscaledContext.imageSmoothingEnabled = false;
@@ -1385,6 +1398,12 @@ function runStep2() {
             step2DepthCanvasUpscaled,
             selectedPixelPartNumber
         );
+        // Auto-chain: if on visual step 2 (painting canvas visible), also run step 3
+        if (typeof currentVisualStep !== 'undefined' && currentVisualStep === 2) {
+            runStep3();
+        } else {
+            enableInteraction();
+        }
     }, 1);
 }
 
@@ -2107,6 +2126,7 @@ step4Canvas3dUpscaled.addEventListener("mouseleave", function (e) {
 document.getElementById("3d-effect-intensity").addEventListener("change", create3dPreview, false);
 
 function runStep4(asyncCallback) {
+    if (typeof updateMosaicProductMeta === 'function') updateMosaicProductMeta();
     disableInteraction();
     const step2PixelArray = getPixelArrayFromCanvas(step2Canvas);
     const step3PixelArray = getPixelArrayFromCanvas(step3Canvas);
@@ -3085,31 +3105,31 @@ if (backToRefineBtn) {
     });
 }
 
-// Order mosaic button
+// Order mosaic button — adds WooCommerce product to cart
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
+var MOSAIC_WC_PRODUCT_ID = 582;
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
-        var width = targetResolution[0];
-        var height = targetResolution[1];
-        var sizeCm = (width * PIXEL_WIDTH_CM).toFixed(0) + 'x' + (height * PIXEL_WIDTH_CM).toFixed(0);
-        var pieces = width * height;
-        var subject = encodeURIComponent('Mosaik Bestellung – ' + width + 'x' + height + ' (' + sizeCm + ' cm)');
-        var body = encodeURIComponent(
-            'Hallo BRICKONAS Team,\n\n' +
-            'ich möchte gerne ein individuelles LEGO Mosaik bestellen:\n\n' +
-            '• Auflösung: ' + width + ' × ' + height + ' Noppen\n' +
-            '• Größe: ca. ' + sizeCm + ' cm\n' +
-            '• Anzahl Teile: ' + pieces + '\n\n' +
-            'Bitte kontaktiert mich für weitere Details.\n\n' +
-            'Viele Grüße'
-        );
-        // Try opening parent kontakt page, fallback to mailto
+        // Navigate parent to WooCommerce add-to-cart URL
         try {
-            window.parent.location.href = '/kontakt-2/?mosaic=1&w=' + width + '&h=' + height;
+            window.parent.location.href = '/warenkorb/?add-to-cart=' + MOSAIC_WC_PRODUCT_ID;
         } catch(e) {
-            window.open('https://brickonas.info/kontakt-2/?mosaic=1&w=' + width + '&h=' + height, '_blank');
+            window.open('https://brickonas.info/warenkorb/?add-to-cart=' + MOSAIC_WC_PRODUCT_ID, '_blank');
         }
     });
+}
+
+// Update product card meta when resolution changes
+function updateMosaicProductMeta() {
+    var sizeEl = document.getElementById('mosaic-product-size');
+    var piecesEl = document.getElementById('mosaic-product-pieces');
+    if (sizeEl) {
+        sizeEl.innerHTML = targetResolution[0] + ' &times; ' + targetResolution[1] + ' Noppen';
+    }
+    if (piecesEl) {
+        var total = targetResolution[0] * targetResolution[1];
+        piecesEl.innerHTML = total.toLocaleString('de-DE') + ' Teile';
+    }
 }
 
 // Stepper circle click handlers

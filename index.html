@@ -502,33 +502,88 @@
         margin-bottom: 12px;
       }
 
-      /* === ORDER BUTTON === */
-      .mosaic-order-btn {
+      /* === PRODUCT CARD (Shop-like order widget) === */
+      .mosaic-product-card {
+        margin-top: 24px;
+        background: var(--bk-white);
+        border: 1px solid var(--bk-gray);
+        border-radius: var(--bk-radius-md);
+        padding: 24px;
+        box-shadow: var(--bk-shadow-sm);
+        transition: box-shadow var(--bk-transition);
+      }
+      .mosaic-product-card:hover {
+        box-shadow: var(--bk-shadow-md);
+      }
+      .mosaic-product-title {
+        font-family: var(--bk-font-heading);
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--bk-charcoal);
+        margin: 0 0 8px;
+      }
+      .mosaic-product-meta {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 10px;
+        font-size: 0.85rem;
+        color: var(--bk-dark-gray);
+      }
+      .mosaic-product-meta span {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        padding: 16px 48px;
+        gap: 4px;
+        background: var(--bk-light-gray);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 600;
+      }
+      .mosaic-product-desc {
+        font-size: 0.9rem;
+        color: var(--bk-dark-gray);
+        margin: 0 0 16px;
+        line-height: 1.5;
+      }
+      .mosaic-product-price-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .mosaic-product-price {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--bk-green-primary);
+        font-family: var(--bk-font-heading);
+      }
+      .mosaic-add-to-cart-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 32px;
         background: linear-gradient(135deg, var(--bk-green-primary), var(--bk-green-dark));
         color: var(--bk-white);
         border: none;
         border-radius: var(--bk-radius-sm);
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 700;
         cursor: pointer;
         transition: all var(--bk-transition);
         box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        font-family: var(--bk-font-body);
       }
-
-      .mosaic-order-btn:hover {
+      .mosaic-add-to-cart-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(46, 125, 50, 0.4);
         background: linear-gradient(135deg, #339933, var(--bk-green-primary));
       }
-
-      .mosaic-order-hint {
-        margin-top: 12px;
-        font-size: 0.85rem;
-        color: var(--bk-dark-gray);
+      .mosaic-add-to-cart-btn.bk-added {
+        background: #43A047 !important;
+        pointer-events: none;
+      }
+      .mosaic-add-to-cart-btn.bk-added::after {
+        content: ' \2713';
       }
 
       /* === PIECE STATS === */
@@ -733,7 +788,8 @@
 
       /* === MISC === */
       .cropper-img { display: block; width: 100%; }
-      .cropper-container { max-width: 100% !important; }
+      .cropper-container { max-width: 100% !important; width: 100% !important; }
+      .mosaic-canvas-area { overflow: hidden; position: relative; }
       #nonzero-missing-pieces-warning { color: var(--bk-accent-red); }
       .checkbox-clickable { cursor: pointer; }
       .piece-count-infinity-placeholder { padding-left: 2px; padding-right: 2px; font-weight: 600; font-size: 18px; }
@@ -1085,80 +1141,41 @@
                   <canvas id="step-4-canvas-upscaled" style=""></canvas>
                 </div>
 
-                <!-- Order / Buy Button -->
-                <div class="mosaic-below-canvas-actions">
-                  <button type="button" id="order-mosaic-button" class="btn mosaic-order-btn" data-i18n="orderMosaic">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
-                    Mosaik bestellen
-                  </button>
-                  <p class="mosaic-order-hint" data-i18n="orderMosaicHint">Wir erstellen dein individuelles LEGO Mosaik und senden es dir zu.</p>
+                <!-- Product Card: Order Mosaic -->
+                <div class="mosaic-product-card" id="mosaic-product-card">
+                  <div class="mosaic-product-info">
+                    <h3 class="mosaic-product-title">Individuelles LEGO&reg; Mosaik</h3>
+                    <div class="mosaic-product-meta" id="mosaic-product-meta">
+                      <span class="mosaic-product-size" id="mosaic-product-size">48 &times; 48 Noppen</span>
+                      <span class="mosaic-product-pieces" id="mosaic-product-pieces">2.304 Teile</span>
+                    </div>
+                    <p class="mosaic-product-desc">Wir fertigen dein individuelles Mosaik aus echten LEGO&reg;-Steinen &ndash; inkl. gedruckter Bauanleitung.</p>
+                    <div class="mosaic-product-price-row">
+                      <span class="mosaic-product-price">ab 49,99 &euro;</span>
+                      <button type="button" id="order-mosaic-button" class="mosaic-add-to-cart-btn">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+                        In den Warenkorb
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-                  <!-- Hidden PDF generation (kept for future use) -->
-                  <div id="pdf-section-hidden" style="display:none;">
+                <!-- Hidden elements kept for JS compatibility -->
+                <div style="display:none;">
+                  <div id="pdf-section-hidden">
                     <div class="progress mosaic-pdf-progress" id="pdf-progress-container" hidden>
                       <div class="progress-bar" id="pdf-progress-bar" role="progressbar" style="background-color: #17a2b8; transition: none"></div>
                     </div>
                     <div id="instructions-canvas-container" hidden></div>
-                    <button type="button" id="download-instructions-button" class="btn mosaic-upload-btn" data-i18n="generateInstructionsPDF">
-                      PDF-Bauanleitung erstellen
-                    </button>
-                    <div class="mosaic-checkbox" style="margin-top: 8px; justify-content: center;">
-                      <input type="checkbox" id="high-quality-instructions-check" />
-                      <span data-i18n="highQualityPdf">Hohe Qualität</span>
-                    </div>
+                    <button type="button" id="download-instructions-button" class="btn mosaic-upload-btn">PDF</button>
+                    <input type="checkbox" id="high-quality-instructions-check" />
                   </div>
-                </div>
-
-                <div id="nonzero-missing-pieces-warning" hidden style="margin-top: 8px;">
-                  <div class="mosaic-warning-card">
-                    <small data-i18n="missingPiecesWarning">'Fehlende Teile' unter 'Verfügbare Farben' muss 0 sein</small>
+                  <div id="nonzero-missing-pieces-warning" hidden></div>
+                  <div id="step-4-accordion">
+                    <table class="table"><thead><tr><th>Farbe</th><th id="pieces-used-dimensions-header" hidden>Dim</th><th>Anzahl</th></tr></thead><tbody id="studs-used-table-body"></tbody></table>
+                    <div id="studs-missing-container" hidden><tbody id="studs-missing-table-body"></tbody></div>
                   </div>
-                </div>
-
-                <!-- Advanced: Pieces Used -->
-                <div class="mosaic-advanced-section">
-                  <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-pieces-used" aria-expanded="false">
-                    <span class="mosaic-advanced-icon">&#x2699;</span>
-                    <span data-i18n="piecesUsed">Verwendete Teile</span>
-                    <span class="mosaic-advanced-chevron">&#x25B8;</span>
-                  </button>
-                  <div id="adv-pieces-used" class="collapse">
-                    <div class="mosaic-advanced-body" id="step-4-accordion">
-                      <table class="table">
-                        <thead>
-                          <tr>
-                            <th data-i18n="color">Farbe</th>
-                            <th id="pieces-used-dimensions-header" hidden data-i18n="dimensions">Dimensionen</th>
-                            <th data-i18n="numberUsed">Anzahl</th>
-                          </tr>
-                        </thead>
-                        <tbody id="studs-used-table-body"></tbody>
-                      </table>
-
-                      <div id="studs-missing-container" hidden>
-                        <h6 style="margin-top: 12px; font-weight: 600;" data-i18n="piecesMissingFromStep3">Fehlende Teile</h6>
-                        <small style="color: var(--bk-dark-gray);" data-i18n="addingPiecesHelp">Das Hinzufügen dieser Teile ermöglicht es, dass das Endbild dem Vorschaubild entspricht</small>
-                        <table class="table" style="margin-top: 8px;">
-                          <thead>
-                            <tr>
-                              <th data-i18n="color">Farbe</th>
-                              <th data-i18n="numberMissing">Fehlend</th>
-                            </tr>
-                          </thead>
-                          <tbody id="studs-missing-table-body"></tbody>
-                        </table>
-                      </div>
-
-                      <div class="mosaic-help-card" style="margin-top: 8px;">
-                        <p style="margin: 0;" data-i18n="pdfGenerationWarning">Abhängig von Ihrer Hardware und der gewählten Auflösung kann die PDF-Erstellung einige Sekunden dauern.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- BrickLink export (hidden, kept for JS) -->
-                <div hidden>
-                  <button type="button" id="export-depth-to-bricklink-button" disabled>Bricklink XML kopieren</button>
+                  <button type="button" id="export-depth-to-bricklink-button" disabled></button>
                 </div>
 
               </div>
