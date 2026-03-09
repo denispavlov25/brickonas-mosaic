@@ -4,8 +4,9 @@ const translations = {
         // Page title and header
         pageTitle: "BRICKONAS Mosaik Konfigurator",
 
-        // Step navigation (2-step visual flow)
+        // Step navigation (3-step visual flow)
         stepperConfigure: "Anpassen",
+        stepperColors: "Farben",
         stepperResult: "Ergebnis",
         step1Label: "Bild & Einstellungen",
         step2Label: "Dein Mosaik",
@@ -40,7 +41,7 @@ const translations = {
         // Navigation buttons
         nextAdjust: "Weiter: Farben anpassen →",
         nextColors: "Weiter: Farben →",
-        nextOutput: "Weiter: Ausgabe →",
+        nextOutput: "Weiter: Ergebnis →",
         backCrop: "← Zurück: Zuschneiden",
         backAdjust: "← Zurück: Anpassen",
         backColors: "← Zurück: Farben",
@@ -139,6 +140,8 @@ const translations = {
         generateDepthInstructionsPDF: "Tiefenanleitung PDF erstellen",
         highQuality: "Hohe Qualität",
         highQualityPdf: "Hohe Qualität PDF",
+        orderMosaic: "Mosaik bestellen",
+        orderMosaicHint: "Wir erstellen dein individuelles LEGO® Mosaik und senden es dir zu.",
         copyBricklinkXML: "Bricklink XML in Zwischenablage kopieren",
         bricklinkUploadPage: "Bricklink Upload-Seite",
         usPickABrickPage: "U.S. Pick a Brick Seite",

@@ -2984,8 +2984,12 @@ function showVisualStep(vstep) {
 
     if (vstep === 1) {
         if (btn1) btn1.classList.add('active');
+    } else if (vstep === 2) {
+        if (btn1) btn1.classList.add('completed');
+        if (btn2) btn2.classList.add('active');
     } else if (vstep === 3) {
         if (btn1) btn1.classList.add('completed');
+        if (btn2) btn2.classList.add('completed');
         if (btn3) btn3.classList.add('active');
     }
 
@@ -3044,22 +3048,67 @@ function invalidateStepsFrom(stepNumber) {
     }
 }
 
-// Step 1 → Result: "Weiter: Ergebnis" — runs all internal steps 1-4, shows result
+// Step 1 → Step 2: "Weiter: Farben" — runs internal steps 1-3, shows color editing
 var createMosaicBtn = document.getElementById('create-mosaic-btn');
 if (createMosaicBtn) {
     createMosaicBtn.addEventListener('click', function() {
         invalidateStepsFrom(1);
+        runStepProcessing(3, function() {
+            showVisualStep(2);
+        });
+    });
+}
+
+// Step 2 → Result: "Weiter: Ergebnis" — runs internal step 4, shows result
+var goToResultBtn = document.getElementById('go-to-result-btn');
+if (goToResultBtn) {
+    goToResultBtn.addEventListener('click', function() {
         runStepProcessing(4, function() {
             showVisualStep(3);
         });
     });
 }
 
-// Result → Step 1: "Zurück: Anpassen"
+// Step 2 → Step 1: "Zurück: Anpassen"
+var backToStep1Btn = document.getElementById('back-to-step1-btn');
+if (backToStep1Btn) {
+    backToStep1Btn.addEventListener('click', function() {
+        showVisualStep(1);
+    });
+}
+
+// Result → Step 2: "Zurück: Farben"
 var backToRefineBtn = document.getElementById('back-to-refine-btn');
 if (backToRefineBtn) {
     backToRefineBtn.addEventListener('click', function() {
-        showVisualStep(1);
+        showVisualStep(2);
+    });
+}
+
+// Order mosaic button
+var orderMosaicBtn = document.getElementById('order-mosaic-button');
+if (orderMosaicBtn) {
+    orderMosaicBtn.addEventListener('click', function() {
+        var width = targetResolution[0];
+        var height = targetResolution[1];
+        var sizeCm = (width * PIXEL_WIDTH_CM).toFixed(0) + 'x' + (height * PIXEL_WIDTH_CM).toFixed(0);
+        var pieces = width * height;
+        var subject = encodeURIComponent('Mosaik Bestellung – ' + width + 'x' + height + ' (' + sizeCm + ' cm)');
+        var body = encodeURIComponent(
+            'Hallo BRICKONAS Team,\n\n' +
+            'ich möchte gerne ein individuelles LEGO Mosaik bestellen:\n\n' +
+            '• Auflösung: ' + width + ' × ' + height + ' Noppen\n' +
+            '• Größe: ca. ' + sizeCm + ' cm\n' +
+            '• Anzahl Teile: ' + pieces + '\n\n' +
+            'Bitte kontaktiert mich für weitere Details.\n\n' +
+            'Viele Grüße'
+        );
+        // Try opening parent kontakt page, fallback to mailto
+        try {
+            window.parent.location.href = '/kontakt-2/?mosaic=1&w=' + width + '&h=' + height;
+        } catch(e) {
+            window.open('https://brickonas.info/kontakt-2/?mosaic=1&w=' + width + '&h=' + height, '_blank');
+        }
     });
 }
 
@@ -3069,6 +3118,8 @@ document.querySelectorAll('.mosaic-stepper-step').forEach(function(btn) {
         var vstep = parseInt(this.dataset.vstep);
         if (vstep === 1) {
             showVisualStep(1);
+        } else if (vstep === 2 && stepProcessed[3]) {
+            showVisualStep(2);
         } else if (vstep === 3 && stepProcessed[4]) {
             showVisualStep(3);
         }
@@ -3077,8 +3128,10 @@ document.querySelectorAll('.mosaic-stepper-step').forEach(function(btn) {
 
 // Legacy goToStep for backward compat (internal code may call it)
 function goToStep(stepNumber) {
-    if (stepNumber <= 3) {
+    if (stepNumber <= 1) {
         showVisualStep(1);
+    } else if (stepNumber <= 3) {
+        showVisualStep(2);
     } else {
         showVisualStep(3);
     }
