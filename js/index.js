@@ -55,6 +55,7 @@ const interactionSelectors = [
 
 const customStudTableBody = document.getElementById("custom-stud-table-body");
 
+var _isRunningStepProcessing = false;
 let _loadingSpinnerTimeout = null;
 
 function disableInteraction() {
@@ -1399,7 +1400,8 @@ function runStep2() {
             selectedPixelPartNumber
         );
         // Auto-chain: if on visual step 2 (painting canvas visible), also run step 3
-        if (typeof currentVisualStep !== 'undefined' && currentVisualStep === 2) {
+        // Skip auto-chain when runStepProcessing is managing the flow (it runs step 3 itself)
+        if (!_isRunningStepProcessing && typeof currentVisualStep !== 'undefined' && currentVisualStep === 2) {
             runStep3();
         } else {
             enableInteraction();
@@ -3034,8 +3036,10 @@ function showVisualStep(vstep) {
 }
 
 function runStepProcessing(targetStep, callback) {
+    _isRunningStepProcessing = true;
     function runStepsSequentially(stepsToRun, index) {
         if (index >= stepsToRun.length) {
+            _isRunningStepProcessing = false;
             if (callback) callback();
             return;
         }
@@ -3057,6 +3061,7 @@ function runStepProcessing(targetStep, callback) {
                     runStepsSequentially(stepsToRun, index + 1);
                 } else if (waited > 60000) {
                     clearInterval(checkComplete);
+                    _isRunningStepProcessing = false;
                     console.error('Step ' + step + ' timed out');
                     enableInteraction();
                 }
