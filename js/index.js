@@ -1543,32 +1543,36 @@ function runStep3() {
     setTimeout(() => {
         stepProcessed[3] = true;
         enableInteraction();
-        step3CanvasUpscaledContext.imageSmoothingEnabled = false;
-        drawStudImageOnCanvas(
-            isBleedthroughEnabled()
-                ? revertDarkenedImage(
-                      alignedPixelArray,
-                      getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
-                  )
-                : alignedPixelArray,
-            targetResolution[0],
-            SCALING_FACTOR,
-            step3CanvasUpscaled,
-            selectedPixelPartNumber,
-            step3VariablePixelPieceDimensions
-        );
-        step3DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
-        step3DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
-        drawStudImageOnCanvas(
-            scaleUpDiscreteDepthPixelsForDisplay(
-                adjustedDepthPixelArray,
-                document.getElementById("num-depth-levels-slider").value
-            ),
-            targetResolution[0],
-            SCALING_FACTOR,
-            step3DepthCanvasUpscaled,
-            selectedPixelPartNumber
-        );
+        try {
+            step3CanvasUpscaledContext.imageSmoothingEnabled = false;
+            drawStudImageOnCanvas(
+                isBleedthroughEnabled()
+                    ? revertDarkenedImage(
+                          alignedPixelArray,
+                          getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((color) => color.hex))
+                      )
+                    : alignedPixelArray,
+                targetResolution[0],
+                SCALING_FACTOR,
+                step3CanvasUpscaled,
+                selectedPixelPartNumber,
+                step3VariablePixelPieceDimensions
+            );
+            step3DepthCanvasUpscaled.width = targetResolution[0] * SCALING_FACTOR;
+            step3DepthCanvasUpscaled.height = targetResolution[1] * SCALING_FACTOR;
+            drawStudImageOnCanvas(
+                scaleUpDiscreteDepthPixelsForDisplay(
+                    adjustedDepthPixelArray,
+                    document.getElementById("num-depth-levels-slider").value
+                ),
+                targetResolution[0],
+                SCALING_FACTOR,
+                step3DepthCanvasUpscaled,
+                selectedPixelPartNumber
+            );
+        } catch (err) {
+            console.error("runStep3 async error:", err);
+        }
     }, 1);
 }
 
@@ -2370,6 +2374,8 @@ function runStep4(asyncCallback) {
             }
         }, 1);
     } catch (_e) {
+        console.error("runStep4 sync error:", _e);
+        stepProcessed[4] = true;
         enableInteraction();
     }
 }
@@ -3117,16 +3123,31 @@ if (backToRefineBtn) {
     });
 }
 
-// Order mosaic button — adds WooCommerce product to cart
+// Order mosaic button — adds WooCommerce product to cart via postMessage
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
 var MOSAIC_WC_PRODUCT_ID = 582;
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
-        // Navigate parent to WooCommerce add-to-cart URL
-        try {
-            window.parent.location.href = '/warenkorb/?add-to-cart=' + MOSAIC_WC_PRODUCT_ID;
-        } catch(e) {
-            window.open('https://brickonas.info/warenkorb/?add-to-cart=' + MOSAIC_WC_PRODUCT_ID, '_blank');
+        var btn = this;
+        btn.disabled = true;
+        btn.classList.add('bk-adding');
+        // Tell parent WordPress page to add product to cart
+        window.parent.postMessage({
+            type: 'mosaic-add-to-cart',
+            productId: MOSAIC_WC_PRODUCT_ID
+        }, '*');
+    });
+    // Listen for response from parent
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'mosaic-cart-result') {
+            var btn = document.getElementById('order-mosaic-button');
+            if (!btn) return;
+            btn.disabled = false;
+            btn.classList.remove('bk-adding');
+            if (e.data.success) {
+                btn.classList.add('bk-added');
+                setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
+            }
         }
     });
 }

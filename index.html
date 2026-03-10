@@ -585,6 +585,13 @@
       .mosaic-add-to-cart-btn.bk-added::after {
         content: ' \2713';
       }
+      .mosaic-add-to-cart-btn.bk-adding {
+        opacity: 0.7;
+        pointer-events: none;
+      }
+      .mosaic-add-to-cart-btn.bk-adding::after {
+        content: '...';
+      }
 
       /* === PIECE STATS === */
       .mosaic-piece-stats {
@@ -1151,7 +1158,7 @@
                     </div>
                     <p class="mosaic-product-desc">Wir fertigen dein individuelles Mosaik aus echten LEGO&reg;-Steinen &ndash; inkl. gedruckter Bauanleitung.</p>
                     <div class="mosaic-product-price-row">
-                      <span class="mosaic-product-price">ab 49,99 &euro;</span>
+                      <span class="mosaic-product-price">49,99 &euro;</span>
                       <button type="button" id="order-mosaic-button" class="mosaic-add-to-cart-btn">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
                         In den Warenkorb
