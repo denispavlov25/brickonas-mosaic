@@ -162,7 +162,16 @@ let targetResolution = [
 ];
 const PIXEL_WIDTH_CM = 0.8;
 const INCHES_IN_CM = 0.393701;
-const SCALING_FACTOR = 40;
+const BASE_SCALING_FACTOR = 40;
+const MAX_CANVAS_DIMENSION = 4096; // Safe for all browsers including mobile
+
+function getScalingFactor(width, height) {
+    const maxDimension = Math.max(width, height);
+    const maxAllowedFactor = Math.floor(MAX_CANVAS_DIMENSION / maxDimension);
+    return Math.max(1, Math.min(BASE_SCALING_FACTOR, maxAllowedFactor));
+}
+
+let SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
 
 // Plate dimensions in studs - updated dynamically based on step selectors
 let PLATE_WIDTH = 16;  // width step (plate width in studs)
@@ -324,6 +333,7 @@ let overridePixelArray = new Array(targetResolution[0] * targetResolution[1] * 4
 let overrideDepthPixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
 
 function handleResolutionChange() {
+    SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
     overridePixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
     overrideDepthPixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
     document.getElementById("width-text").title = `${(targetResolution[0] * PIXEL_WIDTH_CM).toFixed(1)} cm`;

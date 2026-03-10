@@ -140,7 +140,7 @@ const translations = {
         generateDepthInstructionsPDF: "Tiefenanleitung PDF erstellen",
         highQuality: "Hohe Qualität",
         highQualityPdf: "Hohe Qualität PDF",
-        orderMosaic: "Mosaik bestellen",
+        orderMosaic: "Vorbestellen",
         orderMosaicHint: "Wir erstellen dein individuelles LEGO® Mosaik und senden es dir zu.",
         copyBricklinkXML: "Bricklink XML in Zwischenablage kopieren",
         bricklinkUploadPage: "Bricklink Upload-Seite",
