@@ -852,7 +852,15 @@ function runCustomStudMap(skipStep1) {
         selectedSortedStuds = customSortedStuds;
     }
     if (!skipStep1) {
-        runStep1();
+        // When on visual step 2, stud map changes only affect steps 3+ (color quantization).
+        // Step 2 (image crop/filter) is unaffected — no need to invalidate or re-run it.
+        // Only call full runStep1() when NOT on VS2 (e.g., during initial setup).
+        if (typeof currentVisualStep !== 'undefined' && currentVisualStep === 2) {
+            updateStudCountText();
+            invalidateStepsFrom(3);
+        } else {
+            runStep1();
+        }
     }
     // If on visual step 2 (painting canvas visible), re-run step 3 with new stud map
     if (typeof currentVisualStep !== 'undefined' && currentVisualStep === 2 && stepProcessed[2]) {
