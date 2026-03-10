@@ -2206,6 +2206,7 @@ function runStep4(asyncCallback) {
         drawPixelsOnCanvas(availabilityCorrectedPixelArray, step4Canvas);
 
         setTimeout(async () => {
+            try {
             step4CanvasUpscaledContext.imageSmoothingEnabled = false;
             const pixelsToDraw = isBleedthroughEnabled()
                 ? revertDarkenedImage(
@@ -2303,7 +2304,7 @@ function runStep4(asyncCallback) {
             });
 
             const missingPixelsTableBody = document.getElementById("studs-missing-table-body");
-            missingPixelsTableBody.innerHTML = "";
+            if (missingPixelsTableBody) missingPixelsTableBody.innerHTML = "";
 
             let missingPixelsExist = false;
             if (!shouldSideStepStep4) {
@@ -2348,7 +2349,7 @@ function runStep4(asyncCallback) {
                         numberCell.appendChild(numberCellChild);
                         studRow.appendChild(numberCell);
 
-                        missingPixelsTableBody.appendChild(studRow);
+                        if (missingPixelsTableBody) missingPixelsTableBody.appendChild(studRow);
                     }
                 });
             }
@@ -2362,6 +2363,11 @@ function runStep4(asyncCallback) {
             }
             stepProcessed[4] = true;
             enableInteraction();
+            } catch (err) {
+                console.error("runStep4 async error:", err);
+                stepProcessed[4] = true;
+                enableInteraction();
+            }
         }, 1);
     } catch (_e) {
         enableInteraction();
@@ -3037,10 +3043,16 @@ function runStepProcessing(targetStep, callback) {
                 4: runStep4Only
             };
             stepFunctions[step]();
+            var waited = 0;
             var checkComplete = setInterval(function() {
+                waited += 50;
                 if (stepProcessed[step]) {
                     clearInterval(checkComplete);
                     runStepsSequentially(stepsToRun, index + 1);
+                } else if (waited > 60000) {
+                    clearInterval(checkComplete);
+                    console.error('Step ' + step + ' timed out');
+                    enableInteraction();
                 }
             }, 50);
         } else {
