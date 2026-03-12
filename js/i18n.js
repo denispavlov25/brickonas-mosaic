@@ -2,7 +2,7 @@
 const translations = {
     de: {
         // Page title and header
-        pageTitle: "BRICKONAS Mosaik Konfigurator",
+        pageTitle: "BRICKONAS Mosaik BrickPic",
 
         // Step navigation (3-step visual flow)
         stepperConfigure: "Anpassen",
@@ -36,7 +36,7 @@ const translations = {
         step2DepthSubtitle: "Tiefe diskretisieren",
         step3Subtitle: "Bearbeite einzelne Pixel, um dein Mosaik zu perfektionieren",
         step3DepthSubtitle: "Tiefenkarte anpassen",
-        step4Subtitle: "Dein fertiges LEGO® Mosaik",
+        step4Subtitle: "Dein fertiges BRICKONAS Klemmbaustein-Mosaik",
 
         // Navigation buttons
         nextAdjust: "Weiter: Farben anpassen →",
@@ -141,7 +141,7 @@ const translations = {
         highQuality: "Hohe Qualität",
         highQualityPdf: "Hohe Qualität PDF",
         orderMosaic: "Vorbestellen",
-        orderMosaicHint: "Wir erstellen dein individuelles LEGO® Mosaik und senden es dir zu.",
+        orderMosaicHint: "Wir erstellen dein individuelles Mosaik aus hochwertigen LEGO®-kompatiblen Steinen und senden es dir zu.",
         copyBricklinkXML: "Bricklink XML in Zwischenablage kopieren",
         bricklinkUploadPage: "Bricklink Upload-Seite",
         usPickABrickPage: "U.S. Pick a Brick Seite",
@@ -235,8 +235,8 @@ const translations = {
         imagesCreated: "Erstellte Bilder",
 
         // PDF content
-        pdfLegoMosaic: "Lego Mosaik",
-        pdfFilename: "Lego-Mosaik",
+        pdfLegoMosaic: "BRICKONAS Mosaik",
+        pdfFilename: "BRICKONAS-Mosaik",
         pdfInstructions: "Anleitung",
         pdfPart: "Teil",
         pdfResolution: "Auflösung",
