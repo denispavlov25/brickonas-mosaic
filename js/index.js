@@ -3197,17 +3197,16 @@ if (orderMosaicBtn) {
         if (!isStandardResolution()) {
             // Non-standard: redirect to contact page with subject
             var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
-            var subject = encodeURIComponent('Mosaik Anfrage: ' + sizeStr);
-            var contactUrl = 'https://brickonas.info/kontakt-2/?betreff=' + subject;
+            var subject = 'Mosaik Anfrage: ' + sizeStr;
             if (window.self !== window.top) {
-                // In iframe: tell parent to redirect
+                // In iframe: tell parent to redirect (raw text, parent encodes for URL)
                 window.parent.postMessage({
                     type: 'mosaic-contact-redirect',
                     subject: subject
                 }, '*');
             } else {
                 // Standalone: redirect directly
-                window.location.href = contactUrl;
+                window.location.href = 'https://brickonas.info/kontakt-2/?betreff=' + encodeURIComponent(subject);
             }
             return;
         }
