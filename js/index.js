@@ -1312,6 +1312,12 @@ function runStep2() {
             maxHeight: 4096,
             imageSmoothingEnabled: false,
         });
+        if (!croppedCanvas) {
+            console.error("Cropper returned no canvas — re-initializing");
+            enableInteraction();
+            showVisualStep(1);
+            return;
+        }
         inputPixelArray = getPixelArrayFromCanvas(croppedCanvas);
     } else {
         // We're using adaptive pooling
@@ -1320,6 +1326,12 @@ function runStep2() {
             maxHeight: 4096,
             imageSmoothingEnabled: false,
         });
+        if (!croppedCanvas) {
+            console.error("Cropper returned no canvas — re-initializing");
+            enableInteraction();
+            showVisualStep(1);
+            return;
+        }
         rawCroppedData = getPixelArrayFromCanvas(croppedCanvas);
         let subArrayPoolingFunction;
         if (selectedInterpolationAlgorithm === "maxPooling") {
@@ -2882,21 +2894,9 @@ function handleInputImage(e, dontClearDepth, dontLog) {
                 inputDepthCanvasContext.fillStyle = "black";
                 inputDepthCanvasContext.fillRect(0, 0, inputDepthCanvas.width, inputDepthCanvas.height);
             }
-        };
-        inputImage.src = event.target.result;
-        // Show visual step 1 and stepper
-        document.getElementById("visual-step-1").hidden = false;
-        document.getElementById("visual-step-1").classList.add("active");
-        document.getElementById("step-navigation").hidden = false;
-        document.getElementById("input-image-selector").innerHTML = t('reselectInputImage');
-        document.getElementById("image-input-new").appendChild(document.getElementById("image-input"));
-        document.getElementById("image-input-card").hidden = true;
-        // Also set old steps-row for backward compat
-        var stepsRow = document.getElementById("steps-row");
-        if (stepsRow) stepsRow.hidden = false;
-        var exContainer = document.getElementById("run-example-input-container");
-        if (exContainer) exContainer.hidden = true;
-        setTimeout(() => {
+
+            // Draw upscaled canvas and initialize cropper now that
+            // inputCanvas is guaranteed to have image data
             step1CanvasUpscaled.width = SERIALIZE_EDGE_LENGTH;
             step1CanvasUpscaled.height = Math.floor((SERIALIZE_EDGE_LENGTH * inputImage.height) / inputImage.width);
             step1CanvasUpscaledContext.drawImage(
@@ -2915,7 +2915,20 @@ function handleInputImage(e, dontClearDepth, dontLog) {
             overrideDepthPixelArray = new Array(targetResolution[0] * targetResolution[1] * 4).fill(null);
             initializeCropper();
             runStep1();
-        }, 50); // TODO: find better way to check that input is finished
+        };
+        inputImage.src = event.target.result;
+        // Show visual step 1 and stepper
+        document.getElementById("visual-step-1").hidden = false;
+        document.getElementById("visual-step-1").classList.add("active");
+        document.getElementById("step-navigation").hidden = false;
+        document.getElementById("input-image-selector").innerHTML = t('reselectInputImage');
+        document.getElementById("image-input-new").appendChild(document.getElementById("image-input"));
+        document.getElementById("image-input-card").hidden = true;
+        // Also set old steps-row for backward compat
+        var stepsRow = document.getElementById("steps-row");
+        if (stepsRow) stepsRow.hidden = false;
+        var exContainer = document.getElementById("run-example-input-container");
+        if (exContainer) exContainer.hidden = true;
 
         if (!dontLog) {
             perfLoggingDatabase && perfLoggingDatabase.ref("input-image-count/total").transaction(incrementTransaction);
@@ -2945,13 +2958,9 @@ function handleInputDepthMapImage(e) {
                 SERIALIZE_EDGE_LENGTH,
                 SERIALIZE_EDGE_LENGTH
             );
+            runStep1();
         };
         inputImage.src = event.target.result;
-        setTimeout(() => {
-            runStep1();
-        }, 50); // TODO: find better way to check that input is finished
-
-        // TODO: log for perf estimation?
     };
     reader.readAsDataURL(e.target.files[0]);
 }
@@ -3051,12 +3060,22 @@ function showVisualStep(vstep) {
     // When returning to step 1, Cropper.js must be fully reinitialized.
     // The hidden attribute (display:none) makes Cropper lose all internal
     // dimensions — resize() alone cannot recover from that.
-    if (vstep === 1 && inputImageCropper) {
-        var savedCropData = inputImageCropper.getData();
+    // We must also redraw the canvas from inputCanvas because destroy()
+    // can clear canvas pixel data.
+    if (vstep === 1 && inputImage && inputImageCropper) {
+        // Redraw the upscaled canvas from the preserved inputCanvas source
+        step1CanvasUpscaled.width = SERIALIZE_EDGE_LENGTH;
+        step1CanvasUpscaled.height = Math.floor(
+            (SERIALIZE_EDGE_LENGTH * inputImage.height) / inputImage.width
+        );
+        step1CanvasUpscaledContext.drawImage(
+            inputCanvas,
+            0, 0, SERIALIZE_EDGE_LENGTH, SERIALIZE_EDGE_LENGTH,
+            0, 0, step1CanvasUpscaled.width, step1CanvasUpscaled.height
+        );
         initializeCropper();
-        step1CanvasUpscaled.addEventListener('ready', function() {
-            inputImageCropper.setData(savedCropData);
-        }, { once: true });
+        invalidateStepsFrom(2);
+        stepProcessed[1] = true;
     }
 
     // Scroll to top
