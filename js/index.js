@@ -340,6 +340,7 @@ function handleResolutionChange() {
     document.getElementById("height-text").title = `${(targetResolution[1] * PIXEL_WIDTH_CM).toFixed(1)} cm`;
     $('[data-toggle="tooltip"]').tooltip("dispose");
     $('[data-toggle="tooltip"]').tooltip();
+    updatePlateDimensions();
     initializeCropper();
     if (typeof updateMosaicProductMeta === 'function') updateMosaicProductMeta();
     runStep1();
@@ -3146,11 +3147,37 @@ if (backToRefineBtn) {
     });
 }
 
-// Order mosaic button — adds WooCommerce product to cart via postMessage
+// Check if current resolution is a standard (directly orderable) format
+function isStandardResolution() {
+    var w = Number(targetResolution[0]);
+    var h = Number(targetResolution[1]);
+    var pw = PLATE_WIDTH;
+    var ph = PLATE_HEIGHT;
+    // 48x48 with 16x16 plates OR 32x32 with 32x32 plates
+    if (w === 48 && h === 48 && pw === 16 && ph === 16) return true;
+    if (w === 32 && h === 32 && pw === 32 && ph === 32) return true;
+    return false;
+}
+
+// Order mosaic button — adds WooCommerce product to cart or redirects to contact
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
 var MOSAIC_WC_PRODUCT_ID = 582;
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
+        if (!isStandardResolution()) {
+            // Non-standard: redirect to contact page with subject
+            var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
+            var subject = encodeURIComponent('Mosaik Anfrage: ' + sizeStr);
+            window.parent.postMessage({
+                type: 'mosaic-contact-redirect',
+                subject: subject
+            }, '*');
+            // Fallback: open in top window
+            try {
+                window.top.location.href = '/kontakt-2/?betreff=' + subject;
+            } catch(e) {}
+            return;
+        }
         var btn = this;
         btn.disabled = true;
         btn.classList.add('bk-adding');
@@ -3175,7 +3202,7 @@ if (orderMosaicBtn) {
     });
 }
 
-// Update product card meta when resolution changes
+// Update product card meta and button text when resolution changes
 function updateMosaicProductMeta() {
     var sizeEl = document.getElementById('mosaic-product-size');
     var piecesEl = document.getElementById('mosaic-product-pieces');
@@ -3185,6 +3212,19 @@ function updateMosaicProductMeta() {
     if (piecesEl) {
         var total = targetResolution[0] * targetResolution[1];
         piecesEl.innerHTML = total.toLocaleString('de-DE') + ' Teile';
+    }
+    // Update button text based on resolution
+    var btn = document.getElementById('order-mosaic-button');
+    if (btn) {
+        var svgIcon = btn.querySelector('svg');
+        var svgHtml = svgIcon ? svgIcon.outerHTML : '';
+        if (isStandardResolution()) {
+            btn.innerHTML = svgHtml + '\n                        Vorbestellen';
+            btn.classList.remove('bk-inquiry-btn');
+        } else {
+            btn.innerHTML = svgHtml + '\n                        Anfrage senden';
+            btn.classList.add('bk-inquiry-btn');
+        }
     }
 }
 

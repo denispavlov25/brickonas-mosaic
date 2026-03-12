@@ -260,6 +260,14 @@
         display: block;
       }
 
+      /* Smaller canvas in steps 2 and 3 to reduce scrolling */
+      #visual-step-2 .mosaic-canvas-area,
+      #visual-step-3 .mosaic-canvas-area {
+        max-width: 480px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
       .mosaic-controls-panel {
         display: flex;
         flex-direction: column;
@@ -589,6 +597,14 @@
       .mosaic-add-to-cart-btn.bk-adding::after {
         content: '...';
       }
+      .mosaic-add-to-cart-btn.bk-inquiry-btn {
+        background: linear-gradient(135deg, #F57C00, #E65100);
+        box-shadow: 0 4px 12px rgba(230, 81, 0, 0.3);
+      }
+      .mosaic-add-to-cart-btn.bk-inquiry-btn:hover {
+        background: linear-gradient(135deg, #FB8C00, #F57C00);
+        box-shadow: 0 6px 20px rgba(230, 81, 0, 0.4);
+      }
 
       /* === PIECE STATS === */
       .mosaic-piece-stats {
@@ -641,6 +657,13 @@
       .mosaic-action-btn.info:hover { background: #C8E6C9; }
 
       /* === PAINTBRUSH TOOLS === */
+      .mosaic-tools-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--bk-dark-gray);
+        margin-bottom: 6px;
+      }
+
       .mosaic-tools-bar {
         display: flex;
         align-items: center;
@@ -954,15 +977,15 @@
                     <div class="mosaic-canvas-area">
                       <canvas id="step-1-canvas-upscaled" style="" class="cropper-img"></canvas>
                     </div>
-                    <div id="image-input-new"></div>
+                    <div id="image-input-new" style="margin-top: 12px;"></div>
                   </div>
 
                   <!-- Controls Panel (right) -->
                   <div class="mosaic-controls-panel">
-                    <!-- Resolution -->
+                    <!-- Resolution (open by default) -->
                     <div class="mosaic-control-section">
-                      <button class="mosaic-control-header collapsed" data-toggle="collapse" data-target="#ctrl-resolution" aria-expanded="false" data-i18n="resolution">Auflösung</button>
-                      <div id="ctrl-resolution" class="collapse">
+                      <button class="mosaic-control-header" data-toggle="collapse" data-target="#ctrl-resolution" aria-expanded="true" data-i18n="resolution">Auflösung</button>
+                      <div id="ctrl-resolution" class="collapse show">
                         <div class="mosaic-control-body">
                           <div id="step-1-accordion">
                             <div class="mosaic-slider-label">
@@ -991,6 +1014,11 @@
                                 <option value="32">32</option>
                                 <option value="48">48</option>
                               </select>
+                            </div>
+
+                            <!-- Resolution warning -->
+                            <div id="resolution-warning" class="mosaic-help-card" style="margin-top: 12px;">
+                              <p style="margin: 0; font-size: 0.82rem;"><b>Hinweis:</b> Die Formate <b>48&#xD7;48 Noppen (16er Platten)</b> und <b>32&#xD7;32 Noppen (32er Platten)</b> sind direkt vorbestellbar. Bei anderen Aufl&ouml;sungen kannst du eine individuelle Anfrage senden.</p>
                             </div>
                           </div>
                         </div>
@@ -1076,6 +1104,7 @@
             </div>
 
             <!-- Paintbrush Tools -->
+            <div class="mosaic-tools-label">Pixel bearbeiten</div>
             <div class="mosaic-tools-bar">
               <div class="btn-group">
                 <button class="btn dropdown-toggle paintbrush-controls-button" type="button" id="paintbrush-tool-selection-dropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -1093,8 +1122,8 @@
               </button>
             </div>
 
-            <!-- Piece Stats & Available Colors -->
-            <div id="custom-stud-map-controls">
+            <!-- Piece Stats (hidden) -->
+            <div id="custom-stud-map-controls" style="display:none;">
               <div class="mosaic-piece-stats">
                 <div class="mosaic-piece-stat">
                   <div class="stat-value" id="required-studs">0</div>
@@ -1111,45 +1140,36 @@
               </div>
             </div>
 
-            <!-- Advanced: Available Colors -->
-            <div class="mosaic-advanced-section">
-              <button class="mosaic-advanced-toggle" data-toggle="collapse" data-target="#adv-colors" aria-expanded="false">
-                <span class="mosaic-advanced-icon">&#x2699;</span>
-                <span data-i18n="availableColors">Verfügbare Farben</span>
-                <span class="mosaic-advanced-chevron">&#x25B8;</span>
-              </button>
-              <div id="adv-colors" class="collapse">
-                <div class="mosaic-advanced-body">
-                  <div class="mosaic-checkbox" id="infinite-piece-count-check-container">
-                    <input type="checkbox" class="checkbox-clickable" id="infinite-piece-count-check" />
-                    <span data-i18n="infinitePieceCounts">Unendliche Teileanzahl</span>
-                  </div>
-                  <div id="forced-infinite-piece-count-warning" hidden>
-                    <small><p data-i18n="infinitePieceCountsWarning"><b>Wichtig</b>: Unendliche Teileanzahlen wurden verwendet</p></small>
-                  </div>
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th scope="col" data-i18n="color">Farbe</th>
-                        <th scope="col" data-i18n="numberAvailable">Anzahl verfügbar</th>
-                      </tr>
-                    </thead>
-                    <tbody id="custom-stud-table-body"></tbody>
-                  </table>
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="mosaic-action-btn primary" id="add-custom-stud-button" data-i18n="addStud">+ Noppe hinzufügen</button>
-                    <button class="mosaic-action-btn warning" type="button" id="clear-custom-studs-button" data-i18n="clearAvailablePieces">Alle löschen</button>
-                  </div>
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-                    <a id="export-stud-map-button" download="selected-studs.json" href="">
-                      <button class="mosaic-action-btn info" type="button" data-i18n="exportSelectedStuds">Exportieren</button>
-                    </a>
-                    <div class="btn-group">
-                      <button class="btn dropdown-toggle btn-outline-dark btn-sm" type="button" id="mix-in-stud-map-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-i18n="mixInStuds">Set hinzufügen</button>
-                      <div class="dropdown-menu" id="mix-in-stud-map-options" aria-labelledby="mix-in-stud-map-button"></div>
-                      <input type="file" id="import-stud-map-file-input" name="import-stud-map-file-input" hidden />
-                    </div>
-                  </div>
+            <!-- Available Colors (hidden, kept for JS) -->
+            <div style="display:none;">
+              <div class="mosaic-checkbox" id="infinite-piece-count-check-container">
+                <input type="checkbox" class="checkbox-clickable" id="infinite-piece-count-check" />
+                <span data-i18n="infinitePieceCounts">Unendliche Teileanzahl</span>
+              </div>
+              <div id="forced-infinite-piece-count-warning" hidden>
+                <small><p data-i18n="infinitePieceCountsWarning"><b>Wichtig</b>: Unendliche Teileanzahlen wurden verwendet</p></small>
+              </div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="color">Farbe</th>
+                    <th scope="col" data-i18n="numberAvailable">Anzahl verfügbar</th>
+                  </tr>
+                </thead>
+                <tbody id="custom-stud-table-body"></tbody>
+              </table>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="mosaic-action-btn primary" id="add-custom-stud-button" data-i18n="addStud">+ Noppe hinzufügen</button>
+                <button class="mosaic-action-btn warning" type="button" id="clear-custom-studs-button" data-i18n="clearAvailablePieces">Alle löschen</button>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                <a id="export-stud-map-button" download="selected-studs.json" href="">
+                  <button class="mosaic-action-btn info" type="button" data-i18n="exportSelectedStuds">Exportieren</button>
+                </a>
+                <div class="btn-group">
+                  <button class="btn dropdown-toggle btn-outline-dark btn-sm" type="button" id="mix-in-stud-map-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-i18n="mixInStuds">Set hinzufügen</button>
+                  <div class="dropdown-menu" id="mix-in-stud-map-options" aria-labelledby="mix-in-stud-map-button"></div>
+                  <input type="file" id="import-stud-map-file-input" name="import-stud-map-file-input" hidden />
                 </div>
               </div>
             </div>
