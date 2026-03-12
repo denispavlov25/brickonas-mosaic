@@ -3048,6 +3048,14 @@ function showVisualStep(vstep) {
 
     currentVisualStep = vstep;
 
+    // When returning to step 1, Cropper.js needs to recalculate dimensions
+    // because its container was hidden (dimensions were 0)
+    if (vstep === 1 && inputImageCropper) {
+        setTimeout(function() {
+            inputImageCropper.resize();
+        }, 50);
+    }
+
     // Scroll to top
     window.scrollTo(0, 0);
     // Tell parent iframe about height change
@@ -3168,14 +3176,17 @@ if (orderMosaicBtn) {
             // Non-standard: redirect to contact page with subject
             var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
             var subject = encodeURIComponent('Mosaik Anfrage: ' + sizeStr);
-            window.parent.postMessage({
-                type: 'mosaic-contact-redirect',
-                subject: subject
-            }, '*');
-            // Fallback: open in top window
-            try {
-                window.top.location.href = '/kontakt-2/?betreff=' + subject;
-            } catch(e) {}
+            var contactUrl = 'https://brickonas.info/kontakt-2/?betreff=' + subject;
+            if (window.self !== window.top) {
+                // In iframe: tell parent to redirect
+                window.parent.postMessage({
+                    type: 'mosaic-contact-redirect',
+                    subject: subject
+                }, '*');
+            } else {
+                // Standalone: redirect directly
+                window.location.href = contactUrl;
+            }
             return;
         }
         var btn = this;
@@ -3202,6 +3213,17 @@ if (orderMosaicBtn) {
     });
 }
 
+// Get price for current resolution, or null if non-standard
+function getMosaicPrice() {
+    var w = Number(targetResolution[0]);
+    var h = Number(targetResolution[1]);
+    var pw = PLATE_WIDTH;
+    var ph = PLATE_HEIGHT;
+    if (w === 48 && h === 48 && pw === 16 && ph === 16) return '69,99';
+    if (w === 32 && h === 32 && pw === 32 && ph === 32) return '39,99';
+    return null;
+}
+
 // Update product card meta and button text when resolution changes
 function updateMosaicProductMeta() {
     var sizeEl = document.getElementById('mosaic-product-size');
@@ -3212,6 +3234,18 @@ function updateMosaicProductMeta() {
     if (piecesEl) {
         var total = targetResolution[0] * targetResolution[1];
         piecesEl.innerHTML = total.toLocaleString('de-DE') + ' Teile';
+    }
+    // Update price based on resolution
+    var priceEl = document.getElementById('mosaic-product-price');
+    if (priceEl) {
+        var price = getMosaicPrice();
+        if (price) {
+            priceEl.innerHTML = price + ' &euro;';
+            priceEl.style.display = '';
+        } else {
+            priceEl.innerHTML = 'Auf Anfrage';
+            priceEl.style.display = '';
+        }
     }
     // Update button text based on resolution
     var btn = document.getElementById('order-mosaic-button');
