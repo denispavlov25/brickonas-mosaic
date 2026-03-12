@@ -3048,12 +3048,15 @@ function showVisualStep(vstep) {
 
     currentVisualStep = vstep;
 
-    // When returning to step 1, Cropper.js needs to recalculate dimensions
-    // because its container was hidden (dimensions were 0)
+    // When returning to step 1, Cropper.js must be fully reinitialized.
+    // The hidden attribute (display:none) makes Cropper lose all internal
+    // dimensions — resize() alone cannot recover from that.
     if (vstep === 1 && inputImageCropper) {
-        setTimeout(function() {
-            inputImageCropper.resize();
-        }, 50);
+        var savedCropData = inputImageCropper.getData();
+        initializeCropper();
+        step1CanvasUpscaled.addEventListener('ready', function() {
+            inputImageCropper.setData(savedCropData);
+        }, { once: true });
     }
 
     // Scroll to top
