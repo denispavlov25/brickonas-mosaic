@@ -3189,30 +3189,69 @@ function isStandardResolution() {
     return false;
 }
 
+// Collect mosaic summary data (image + colors) for email notification
+function collectMosaicOrderData() {
+    // Get the mosaic preview image from the upscaled canvas
+    var canvas = document.getElementById('step-4-canvas-upscaled');
+    var image = '';
+    if (canvas) {
+        try { image = canvas.toDataURL('image/png', 0.85); } catch(ex) {}
+    }
+    // Collect used colors with names and counts
+    var colors = [];
+    var usedMap = getUsedPixelsStudMap(getPixelArrayFromCanvas(step4Canvas));
+    var hexKeys = Object.keys(usedMap);
+    hexKeys.sort();
+    hexKeys.forEach(function(hex) {
+        var name = translateColor(HEX_TO_COLOR_NAME[hex]);
+        if (!name) { name = HEX_TO_COLOR_NAME[hex]; }
+        if (!name) { name = hex; }
+        colors.push({ name: name, hex: hex, count: usedMap[hex] });
+    });
+    var total = targetResolution[0] * targetResolution[1];
+    var price = getMosaicPrice();
+    return {
+        resolution: targetResolution[0] + ' x ' + targetResolution[1] + ' Noppen',
+        plates: PLATE_WIDTH + ' x ' + PLATE_HEIGHT + ' Platten',
+        totalPieces: total,
+        price: price ? (price + ' \u20AC') : 'Auf Anfrage',
+        colors: colors,
+        image: image
+    };
+}
+
 // Order mosaic button — adds WooCommerce product to cart or redirects to contact
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
 var MOSAIC_WC_PRODUCT_ID = 582;
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
+        var statusEl = document.getElementById('mosaic-order-status');
+
         if (!isStandardResolution()) {
             // Non-standard: redirect to contact page with subject
             var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
             var subject = 'Mosaik Anfrage: ' + sizeStr;
+
+            // Also send email notification for non-standard inquiries
+            sendMosaicOrderEmail(statusEl);
+
             if (window.self !== window.top) {
-                // In iframe: tell parent to redirect (raw text, parent encodes for URL)
                 window.parent.postMessage({
                     type: 'mosaic-contact-redirect',
                     subject: subject
                 }, '*');
             } else {
-                // Standalone: redirect directly
-                window.location.href = 'https://brickonas.info/kontakt-2/?betreff=' + encodeURIComponent(subject);
+                window.location.href = 'https://brickonas.info/kontakt/?betreff=' + encodeURIComponent(subject);
             }
             return;
         }
         var btn = this;
         btn.disabled = true;
         btn.classList.add('bk-adding');
+
+        // Send email notification with mosaic details
+        sendMosaicOrderEmail(statusEl);
+
         // Tell parent WordPress page to add product to cart
         window.parent.postMessage({
             type: 'mosaic-add-to-cart',
@@ -3221,17 +3260,78 @@ if (orderMosaicBtn) {
     });
     // Listen for response from parent
     window.addEventListener('message', function(e) {
-        if (e.data && e.data.type === 'mosaic-cart-result') {
-            var btn = document.getElementById('order-mosaic-button');
-            if (!btn) return;
-            btn.disabled = false;
-            btn.classList.remove('bk-adding');
-            if (e.data.success) {
-                btn.classList.add('bk-added');
-                setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
+        if (e.data) {
+            if (e.data.type === 'mosaic-cart-result') {
+                var btn = document.getElementById('order-mosaic-button');
+                if (!btn) return;
+                btn.disabled = false;
+                btn.classList.remove('bk-adding');
+                if (e.data.success) {
+                    btn.classList.add('bk-added');
+                    setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
+                }
+            }
+            if (e.data.type === 'mosaic-email-result') {
+                var statusEl = document.getElementById('mosaic-order-status');
+                if (statusEl) {
+                    statusEl.className = 'mosaic-order-status';
+                    if (e.data.success) {
+                        statusEl.classList.add('bk-sent');
+                        statusEl.innerHTML = '\u2713 ' + t('orderEmailSent');
+                        setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
+                    } else {
+                        statusEl.classList.add('bk-error');
+                        statusEl.innerHTML = '\u26A0 ' + t('orderEmailError');
+                        setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
+                    }
+                }
             }
         }
     });
+}
+
+// Send mosaic order details to parent WP page for email
+function sendMosaicOrderEmail(statusEl) {
+    if (statusEl) {
+        statusEl.className = 'mosaic-order-status bk-sending';
+        statusEl.innerHTML = '\u23F3 ' + t('orderEmailSending');
+    }
+    var data = collectMosaicOrderData();
+    if (window.self !== window.top) {
+        // In iframe: tell parent to send the email
+        window.parent.postMessage({
+            type: 'mosaic-order-email',
+            orderData: data
+        }, '*');
+    } else {
+        // Standalone: post directly to WP endpoint
+        fetch('https://brickonas.info/wp-json/brickonas/v1/mosaic-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (statusEl) {
+                statusEl.className = 'mosaic-order-status';
+                if (d.success) {
+                    statusEl.classList.add('bk-sent');
+                    statusEl.innerHTML = '\u2713 ' + t('orderEmailSent');
+                } else {
+                    statusEl.classList.add('bk-error');
+                    statusEl.innerHTML = '\u26A0 ' + t('orderEmailError');
+                }
+                setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
+            }
+        })
+        .catch(function() {
+            if (statusEl) {
+                statusEl.className = 'mosaic-order-status bk-error';
+                statusEl.innerHTML = '\u26A0 ' + t('orderEmailError');
+                setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
+            }
+        });
+    }
 }
 
 // Get price for current resolution, or null if non-standard
