@@ -3225,43 +3225,99 @@ var orderMosaicBtn = document.getElementById('order-mosaic-button');
 var MOSAIC_WC_PRODUCT_ID = 582;
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
+        console.log('[BRICKONAS] Vorbestellen button clicked');
         var statusEl = document.getElementById('mosaic-order-status');
+        var btn = this;
 
-        if (!isStandardResolution()) {
-            // Non-standard: redirect to contact page with subject
-            var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
-            var subject = 'Mosaik Anfrage: ' + sizeStr;
+        try {
+            if (!isStandardResolution()) {
+                // Non-standard: redirect to contact page with subject
+                var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
+                var subject = 'Mosaik Anfrage: ' + sizeStr;
 
-            // Also send email notification for non-standard inquiries
-            sendMosaicOrderEmail(statusEl);
+                // Also send email notification for non-standard inquiries
+                try { sendMosaicOrderEmail(statusEl); } catch(emailErr) {
+                    console.error('[BRICKONAS] Email error:', emailErr);
+                }
 
+                if (window.self !== window.top) {
+                    window.parent.postMessage({
+                        type: 'mosaic-contact-redirect',
+                        subject: subject
+                    }, '*');
+                } else {
+                    window.location.href = 'https://brickonas.info/kontakt/?betreff=' + encodeURIComponent(subject);
+                }
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('bk-adding');
+
+            // Send email notification with mosaic details
+            try { sendMosaicOrderEmail(statusEl); } catch(emailErr) {
+                console.error('[BRICKONAS] Email error:', emailErr);
+            }
+
+            // Tell parent WordPress page to add product to cart
+            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', MOSAIC_WC_PRODUCT_ID);
             if (window.self !== window.top) {
                 window.parent.postMessage({
-                    type: 'mosaic-contact-redirect',
-                    subject: subject
+                    type: 'mosaic-add-to-cart',
+                    productId: MOSAIC_WC_PRODUCT_ID
                 }, '*');
             } else {
-                window.location.href = 'https://brickonas.info/kontakt/?betreff=' + encodeURIComponent(subject);
+                // Standalone fallback: add to cart directly
+                console.log('[BRICKONAS] Standalone mode: adding to cart via fetch');
+                var formData = new FormData();
+                formData.append('product_id', MOSAIC_WC_PRODUCT_ID);
+                formData.append('quantity', 1);
+                fetch('https://brickonas.info/?wc-ajax=add_to_cart', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    console.log('[BRICKONAS] Cart response:', data);
+                    btn.disabled = false;
+                    btn.classList.remove('bk-adding');
+                    if (!data.error) {
+                        btn.classList.add('bk-added');
+                        setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
+                    }
+                })
+                .catch(function(err) {
+                    console.error('[BRICKONAS] Cart error:', err);
+                    btn.disabled = false;
+                    btn.classList.remove('bk-adding');
+                });
             }
-            return;
+
+            // Safety: re-enable button after 10 seconds if no response
+            setTimeout(function() {
+                if (btn.disabled) {
+                    console.log('[BRICKONAS] Timeout: re-enabling button');
+                    btn.disabled = false;
+                    btn.classList.remove('bk-adding');
+                }
+            }, 10000);
+
+        } catch(err) {
+            console.error('[BRICKONAS] Vorbestellen error:', err);
+            btn.disabled = false;
+            btn.classList.remove('bk-adding');
+            if (statusEl) {
+                statusEl.className = 'mosaic-order-status bk-error';
+                statusEl.innerHTML = '\u26A0 Fehler: ' + err.message;
+                setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
+            }
         }
-        var btn = this;
-        btn.disabled = true;
-        btn.classList.add('bk-adding');
-
-        // Send email notification with mosaic details
-        sendMosaicOrderEmail(statusEl);
-
-        // Tell parent WordPress page to add product to cart
-        window.parent.postMessage({
-            type: 'mosaic-add-to-cart',
-            productId: MOSAIC_WC_PRODUCT_ID
-        }, '*');
     });
     // Listen for response from parent
     window.addEventListener('message', function(e) {
         if (e.data) {
             if (e.data.type === 'mosaic-cart-result') {
+                console.log('[BRICKONAS] Cart result:', e.data.success);
                 var btn = document.getElementById('order-mosaic-button');
                 if (!btn) return;
                 btn.disabled = false;
@@ -3272,6 +3328,7 @@ if (orderMosaicBtn) {
                 }
             }
             if (e.data.type === 'mosaic-email-result') {
+                console.log('[BRICKONAS] Email result:', e.data.success);
                 var statusEl = document.getElementById('mosaic-order-status');
                 if (statusEl) {
                     statusEl.className = 'mosaic-order-status';
