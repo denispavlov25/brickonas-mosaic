@@ -651,6 +651,99 @@
         color: #E65100;
       }
 
+      /* === DOWNLOAD INSTRUCTIONS SECTION === */
+      .mosaic-download-section {
+        margin-top: 20px;
+        background: var(--bk-white);
+        border: 1px solid var(--bk-gray);
+        border-radius: var(--bk-radius-md);
+        padding: 20px 24px;
+        box-shadow: var(--bk-shadow-sm);
+      }
+      .mosaic-download-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .mosaic-download-header svg {
+        flex-shrink: 0;
+        color: var(--bk-green-primary);
+      }
+      .mosaic-download-header h4 {
+        margin: 0;
+        font-family: var(--bk-font-heading);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--bk-charcoal);
+      }
+      .mosaic-download-desc {
+        font-size: 0.85rem;
+        color: var(--bk-dark-gray);
+        line-height: 1.5;
+        margin: 0 0 16px;
+      }
+      .mosaic-download-section .mosaic-pdf-progress {
+        height: 37px;
+        margin-bottom: 12px;
+        border-radius: var(--bk-radius-sm);
+        overflow: hidden;
+        background: var(--bk-light-gray);
+      }
+      .mosaic-download-section .mosaic-pdf-progress .progress-bar {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--bk-white);
+      }
+      .mosaic-download-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .mosaic-download-actions .mosaic-action-btn {
+        padding: 12px 24px;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+      .mosaic-quality-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: var(--bk-dark-gray);
+        cursor: pointer;
+        user-select: none;
+      }
+      .mosaic-quality-toggle input[type="checkbox"] {
+        accent-color: var(--bk-green-primary);
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      .mosaic-download-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 10px 14px;
+        background: #E3F2FD;
+        border: 1px solid #90CAF9;
+        border-radius: var(--bk-radius-sm);
+        font-size: 0.8rem;
+        color: #1565C0;
+        line-height: 1.4;
+      }
+      .mosaic-download-hint svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+        color: #1976D2;
+      }
+
       /* === PIECE STATS === */
       .mosaic-piece-stats {
         display: grid;
@@ -892,6 +985,9 @@
         .mosaic-product-price-row { flex-direction: column; align-items: stretch; }
         .mosaic-add-to-cart-btn { width: 100%; justify-content: center; padding: 14px 20px; }
         .mosaic-product-meta { flex-wrap: wrap; gap: 8px; }
+        .mosaic-download-section { padding: 16px; }
+        .mosaic-download-actions { flex-direction: column; align-items: stretch; }
+        .mosaic-download-actions .mosaic-action-btn { width: 100%; justify-content: center; }
       }
 
       /* Mobile */
@@ -914,6 +1010,10 @@
         .mosaic-control-header { padding: 10px 12px; font-size: 0.85rem; }
         .mosaic-control-body { padding: 8px 10px 12px; }
         .mosaic-product-card { padding: 14px; }
+        .mosaic-download-section { padding: 14px; }
+        .mosaic-download-header h4 { font-size: 1rem; }
+        .mosaic-download-desc { font-size: 0.8rem; }
+        .mosaic-download-hint { font-size: 0.75rem; }
         .mosaic-product-title { font-size: 1.1rem; }
         .mosaic-product-price { font-size: 1.3rem; }
         .mosaic-product-desc { font-size: 0.85rem; }
@@ -1274,16 +1374,35 @@
                   </div>
                 </div>
 
+                <!-- Download Instructions Section -->
+                <div class="mosaic-download-section">
+                  <div class="mosaic-download-header">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
+                    <h4 data-i18n="downloadInstructionsTitle">Bauanleitung herunterladen</h4>
+                  </div>
+                  <p class="mosaic-download-desc" data-i18n="downloadInstructionsDesc">Lade die Schritt-f&uuml;r-Schritt Bauanleitung als PDF herunter. Bitte speichere die Datei &ndash; sie kann sp&auml;ter nicht erneut generiert werden.</p>
+                  <div class="progress mosaic-pdf-progress" id="pdf-progress-container" hidden>
+                    <div class="progress-bar" id="pdf-progress-bar" role="progressbar" style="background-color: var(--bk-green-primary); transition: none"></div>
+                  </div>
+                  <div id="instructions-canvas-container" hidden></div>
+                  <div class="mosaic-download-actions">
+                    <button type="button" id="download-instructions-button" class="mosaic-action-btn primary">
+                      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      <span data-i18n="downloadInstructionsBtn">Bauanleitung PDF</span>
+                    </button>
+                    <label class="mosaic-quality-toggle">
+                      <input type="checkbox" id="high-quality-instructions-check" />
+                      <span data-i18n="highQuality">Hohe Qualit&auml;t</span>
+                    </label>
+                  </div>
+                  <div class="mosaic-download-hint">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span data-i18n="downloadInstructionsHint">Tipp: Speichere die PDF-Datei an einem sicheren Ort, damit du sie jederzeit wieder verwenden kannst.</span>
+                  </div>
+                </div>
+
                 <!-- Hidden elements kept for JS compatibility -->
                 <div style="display:none;">
-                  <div id="pdf-section-hidden">
-                    <div class="progress mosaic-pdf-progress" id="pdf-progress-container" hidden>
-                      <div class="progress-bar" id="pdf-progress-bar" role="progressbar" style="background-color: #17a2b8; transition: none"></div>
-                    </div>
-                    <div id="instructions-canvas-container" hidden></div>
-                    <button type="button" id="download-instructions-button" class="btn mosaic-upload-btn">PDF</button>
-                    <input type="checkbox" id="high-quality-instructions-check" />
-                  </div>
                   <div id="nonzero-missing-pieces-warning" hidden></div>
                   <div id="step-4-accordion">
                     <table class="table"><thead><tr><th>Farbe</th><th id="pieces-used-dimensions-header" hidden>Dim</th><th>Anzahl</th></tr></thead><tbody id="studs-used-table-body"></tbody></table>

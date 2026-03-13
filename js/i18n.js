@@ -271,6 +271,12 @@ const translations = {
         depthPlatesHelp3: "● Beachten Sie, dass größere Platten schwer von der Basis zu befestigen/entfernen sein können",
         availablePlates: "Verfügbare Platten:",
 
+        // Download Instructions section
+        downloadInstructionsTitle: "Bauanleitung herunterladen",
+        downloadInstructionsDesc: "Lade die Schritt-für-Schritt Bauanleitung als PDF herunter. Bitte speichere die Datei \u2013 sie kann später nicht erneut generiert werden.",
+        downloadInstructionsBtn: "Bauanleitung PDF",
+        downloadInstructionsHint: "Tipp: Speichere die PDF-Datei an einem sicheren Ort, damit du sie jederzeit wieder verwenden kannst.",
+
         // New labels for redesign
         advancedSettings: "Erweiterte Einstellungen",
         yourMosaic: "Dein Mosaik",
