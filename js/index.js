@@ -3222,7 +3222,17 @@ function collectMosaicOrderData() {
 
 // Order mosaic button — adds WooCommerce product to cart or redirects to contact
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
-var MOSAIC_WC_PRODUCT_ID = 582;
+// Product IDs per mosaic size
+var MOSAIC_WC_PRODUCT_48x48 = 582;  // 48x48 Noppen, 16er Platten → 69,99€
+var MOSAIC_WC_PRODUCT_32x32 = 664;  // 32x32 Noppen, 32er Platten → 39,99€
+function getMosaicProductId() {
+    var w = Number(targetResolution[0]);
+    var h = Number(targetResolution[1]);
+    var pw = PLATE_WIDTH;
+    var ph = PLATE_HEIGHT;
+    if (w === 32 && h === 32 && pw === 32 && ph === 32) return MOSAIC_WC_PRODUCT_32x32;
+    return MOSAIC_WC_PRODUCT_48x48;
+}
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
         console.log('[BRICKONAS] Vorbestellen button clicked');
@@ -3260,17 +3270,17 @@ if (orderMosaicBtn) {
             }
 
             // Tell parent WordPress page to add product to cart
-            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', MOSAIC_WC_PRODUCT_ID);
+            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', getMosaicProductId());
             if (window.self !== window.top) {
                 window.parent.postMessage({
                     type: 'mosaic-add-to-cart',
-                    productId: MOSAIC_WC_PRODUCT_ID
+                    productId: getMosaicProductId()
                 }, '*');
             } else {
                 // Standalone fallback: add to cart directly
                 console.log('[BRICKONAS] Standalone mode: adding to cart via fetch');
                 var formData = new FormData();
-                formData.append('product_id', MOSAIC_WC_PRODUCT_ID);
+                formData.append('product_id', getMosaicProductId());
                 formData.append('quantity', 1);
                 fetch('https://brickonas.info/?wc-ajax=add_to_cart', {
                     method: 'POST',
