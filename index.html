@@ -805,6 +805,7 @@
       .mosaic-tools-bar {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 6px;
         padding: 8px 12px;
         background: var(--bk-light-gray);
@@ -817,13 +818,22 @@
         border: 1px solid var(--bk-gray);
         border-radius: var(--bk-radius-sm);
         height: 36px;
-        width: 36px;
+        min-width: 36px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         transition: all 0.2s;
         padding: 0;
+      }
+
+      /* Dropdown tool selector needs auto width for text labels */
+      #paintbrush-tool-selection-dropdown {
+        width: auto;
+        padding: 0 10px;
+        gap: 6px;
+        font-size: 0.85rem;
+        white-space: nowrap;
       }
 
       .paintbrush-controls-button:hover:enabled {
