@@ -3368,16 +3368,31 @@ function sendMosaicOrderEmail(statusEl) {
     }
 }
 
-// Get price for current resolution. Non-standard sizes fall back to the
-// 48x48 placeholder price until per-size pricing is wired up.
+// Prices come live from WooCommerce via parent-page postMessage (WP page
+// fetches /wp-json/wc/store/v1/products/{id} and forwards the result).
+// Fallbacks match the WC product prices as of April 2026.
+var MOSAIC_PRICE_CACHE = {
+    '582': '69,99',  // 48x48 default
+    '664': '39,99'   // 32x32
+};
+
 function getMosaicPrice() {
-    var w = Number(targetResolution[0]);
-    var h = Number(targetResolution[1]);
-    var pw = PLATE_WIDTH;
-    var ph = PLATE_HEIGHT;
-    if (w === 32 && h === 32 && pw === 32 && ph === 32) return '39,99';
-    return '69,99';
+    var productId = String(getMosaicProductId());
+    return MOSAIC_PRICE_CACHE[productId] || MOSAIC_PRICE_CACHE['582'];
 }
+
+// Listen for live prices from parent WP page
+window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== 'mosaic-prices') return;
+    var prices = e.data.prices;
+    if (!prices) return;
+    Object.keys(prices).forEach(function(pid) {
+        if (prices[pid]) MOSAIC_PRICE_CACHE[String(pid)] = prices[pid];
+    });
+    if (typeof updateMosaicProductMeta === 'function') {
+        try { updateMosaicProductMeta(); } catch(ex) {}
+    }
+});
 
 // Update product card meta and button text when resolution changes
 function updateMosaicProductMeta() {
