@@ -3177,18 +3177,6 @@ if (backToRefineBtn) {
     });
 }
 
-// Check if current resolution is a standard (directly orderable) format
-function isStandardResolution() {
-    var w = Number(targetResolution[0]);
-    var h = Number(targetResolution[1]);
-    var pw = PLATE_WIDTH;
-    var ph = PLATE_HEIGHT;
-    // 48x48 with 16x16 plates OR 32x32 with 32x32 plates
-    if (w === 48 && h === 48 && pw === 16 && ph === 16) return true;
-    if (w === 32 && h === 32 && pw === 32 && ph === 32) return true;
-    return false;
-}
-
 // Collect mosaic summary data (image + colors) for email notification
 function collectMosaicOrderData() {
     // Get the mosaic preview image from the upscaled canvas
@@ -3214,13 +3202,13 @@ function collectMosaicOrderData() {
         resolution: targetResolution[0] + ' x ' + targetResolution[1] + ' Noppen',
         plates: PLATE_WIDTH + ' x ' + PLATE_HEIGHT + ' Platten',
         totalPieces: total,
-        price: price ? (price + ' \u20AC') : 'Auf Anfrage',
+        price: price + ' \u20AC',
         colors: colors,
         image: image
     };
 }
 
-// Order mosaic button — adds WooCommerce product to cart or redirects to contact
+// Order mosaic button — adds WooCommerce product to cart
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
 // Product IDs per mosaic size
 var MOSAIC_WC_PRODUCT_48x48 = 582;  // 48x48 Noppen, 16er Platten → 69,99€
@@ -3235,32 +3223,11 @@ function getMosaicProductId() {
 }
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', function() {
-        console.log('[BRICKONAS] Vorbestellen button clicked');
+        console.log('[BRICKONAS] Bestellen button clicked');
         var statusEl = document.getElementById('mosaic-order-status');
         var btn = this;
 
         try {
-            if (!isStandardResolution()) {
-                // Non-standard: redirect to contact page with subject
-                var sizeStr = targetResolution[0] + 'x' + targetResolution[1] + ' Noppen (' + PLATE_WIDTH + 'er Platten)';
-                var subject = 'Mosaik Anfrage: ' + sizeStr;
-
-                // Also send email notification for non-standard inquiries
-                try { sendMosaicOrderEmail(statusEl); } catch(emailErr) {
-                    console.error('[BRICKONAS] Email error:', emailErr);
-                }
-
-                if (window.self !== window.top) {
-                    window.parent.postMessage({
-                        type: 'mosaic-contact-redirect',
-                        subject: subject
-                    }, '*');
-                } else {
-                    window.location.href = 'https://brickonas.info/kontakt/?betreff=' + encodeURIComponent(subject);
-                }
-                return;
-            }
-
             btn.disabled = true;
             btn.classList.add('bk-adding');
 
@@ -3313,7 +3280,7 @@ if (orderMosaicBtn) {
             }, 10000);
 
         } catch(err) {
-            console.error('[BRICKONAS] Vorbestellen error:', err);
+            console.error('[BRICKONAS] Bestellen error:', err);
             btn.disabled = false;
             btn.classList.remove('bk-adding');
             if (statusEl) {
@@ -3401,15 +3368,15 @@ function sendMosaicOrderEmail(statusEl) {
     }
 }
 
-// Get price for current resolution, or null if non-standard
+// Get price for current resolution. Non-standard sizes fall back to the
+// 48x48 placeholder price until per-size pricing is wired up.
 function getMosaicPrice() {
     var w = Number(targetResolution[0]);
     var h = Number(targetResolution[1]);
     var pw = PLATE_WIDTH;
     var ph = PLATE_HEIGHT;
-    if (w === 48 && h === 48 && pw === 16 && ph === 16) return '69,99';
     if (w === 32 && h === 32 && pw === 32 && ph === 32) return '39,99';
-    return null;
+    return '69,99';
 }
 
 // Update product card meta and button text when resolution changes
@@ -3426,27 +3393,15 @@ function updateMosaicProductMeta() {
     // Update price based on resolution
     var priceEl = document.getElementById('mosaic-product-price');
     if (priceEl) {
-        var price = getMosaicPrice();
-        if (price) {
-            priceEl.innerHTML = price + ' &euro;';
-            priceEl.style.display = '';
-        } else {
-            priceEl.innerHTML = 'Auf Anfrage';
-            priceEl.style.display = '';
-        }
+        priceEl.innerHTML = getMosaicPrice() + ' &euro;';
+        priceEl.style.display = '';
     }
-    // Update button text based on resolution
+    // Update button text
     var btn = document.getElementById('order-mosaic-button');
     if (btn) {
         var svgIcon = btn.querySelector('svg');
         var svgHtml = svgIcon ? svgIcon.outerHTML : '';
-        if (isStandardResolution()) {
-            btn.innerHTML = svgHtml + '\n                        Vorbestellen';
-            btn.classList.remove('bk-inquiry-btn');
-        } else {
-            btn.innerHTML = svgHtml + '\n                        Anfrage senden';
-            btn.classList.add('bk-inquiry-btn');
-        }
+        btn.innerHTML = svgHtml + '\n                        Bestellen';
     }
 }
 
