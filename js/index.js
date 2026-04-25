@@ -3368,20 +3368,34 @@ function sendMosaicOrderEmail(statusEl) {
     }
 }
 
-// Prices come live from WooCommerce via parent-page postMessage (WP page
-// fetches /wp-json/wc/store/v1/products/{id} and forwards the result).
-// Fallbacks match the WC product prices as of April 2026.
+// Prices come from URL query params injected server-side by the WP plugin
+// (BRICKONAS Mosaic Prices). Format: ?price_48x48=69,99&price_32x32=39,99
+// Fallbacks if the iframe is loaded standalone or the plugin is inactive.
 var MOSAIC_PRICE_CACHE = {
     '582': '69,99',  // 48x48 default
     '664': '39,99'   // 32x32
 };
+
+(function readPricesFromQuery(){
+    try {
+        var params = new URLSearchParams(window.location.search);
+        var sizes = ['48x48', '32x32'];
+        sizes.forEach(function(size){
+            var price = params.get('price_' + size);
+            var pid = params.get('pid_' + size);
+            if (price && pid) {
+                MOSAIC_PRICE_CACHE[String(pid)] = price;
+            }
+        });
+    } catch(ex) {}
+})();
 
 function getMosaicPrice() {
     var productId = String(getMosaicProductId());
     return MOSAIC_PRICE_CACHE[productId] || MOSAIC_PRICE_CACHE['582'];
 }
 
-// Listen for live prices from parent WP page
+// Backwards compat: still accept postMessage-based price updates
 window.addEventListener('message', function(e) {
     if (!e.data || e.data.type !== 'mosaic-prices') return;
     var prices = e.data.prices;
