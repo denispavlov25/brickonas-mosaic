@@ -2541,15 +2541,38 @@ async function _generateBlobFromStep4() {
     const JPEG_QUALITY_TITLE = totalNoppen <= 96 * 96 ? 0.97
                              : totalNoppen <= 192 * 192 ? 0.95
                              : 0.93; // title gets a quality bonus — it's the showpiece
+    // Enforce a minimum page size so large mosaics don't get tiny pages.
+    // A4 is 210x297mm, A3 is 297x420mm. We use a generous 420x540mm so
+    // print quality stays high for any mosaic size.
+    const MIN_PAGE_W = 420;
+    const MIN_PAGE_H = 540;
+    let pageW = Math.max(titlePageCanvas.width, MIN_PAGE_W);
+    let pageH = Math.max(titlePageCanvas.height, MIN_PAGE_H);
+    // Keep title aspect ratio if larger than min
+    if (titlePageCanvas.width > MIN_PAGE_W || titlePageCanvas.height > MIN_PAGE_H) {
+        pageW = titlePageCanvas.width;
+        pageH = titlePageCanvas.height;
+    }
     const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_TITLE);
     let pdf = new jsPDF({
-        orientation: titlePageCanvas.width < titlePageCanvas.height ? "p" : "l",
+        orientation: pageW < pageH ? "p" : "l",
         unit: "mm",
-        format: [titlePageCanvas.width, titlePageCanvas.height],
+        format: [pageW, pageH],
     });
     const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
     const totalPlates = resultImage.length / (4 * PLATE_WIDTH * PLATE_WIDTH);
-    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
+    // Center the title image on the page if image is smaller than page
+    const titleImgRatio = titlePageCanvas.width / titlePageCanvas.height;
+    let titleW = pdfWidth;
+    let titleH = pdfWidth / titleImgRatio;
+    if (titleH > pdfHeight) {
+        titleH = pdfHeight;
+        titleW = pdfHeight * titleImgRatio;
+    }
+    const titleX = (pdfWidth - titleW) / 2;
+    const titleY = (pdfHeight - titleH) / 2;
+    pdf.addImage(imgData, "JPEG", titleX, titleY, titleW, titleH);
     titlePageCanvas.remove();
 
     for (var i = 0; i < totalPlates; i++) {
@@ -2566,7 +2589,17 @@ async function _generateBlobFromStep4() {
             instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
         setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
         const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
-        pdf.addImage(pageImgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width);
+        // Fit instruction page into the PDF page, preserving aspect ratio + center it
+        const pageImgRatio = instructionPageCanvas.width / instructionPageCanvas.height;
+        let drawW = pdfWidth;
+        let drawH = pdfWidth / pageImgRatio;
+        if (drawH > pdfHeight) {
+            drawH = pdfHeight;
+            drawW = pdfHeight * pageImgRatio;
+        }
+        const drawX = (pdfWidth - drawW) / 2;
+        const drawY = (pdfHeight - drawH) / 2;
+        pdf.addImage(pageImgData, "JPEG", drawX, drawY, drawW, drawH);
         instructionPageCanvas.width = 0;
         instructionPageCanvas.height = 0;
     }
