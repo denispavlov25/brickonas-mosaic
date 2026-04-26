@@ -2510,8 +2510,8 @@ async function generateInstructionsAsBlob() {
 async function _generateBlobFromStep4() {
     const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
 
-    // Always upload in high quality — this is the printable copy delivered with the kit.
-    const isHighQuality = true;
+    // Standard quality — keeps PDF size + upload time reasonable for customers.
+    const isHighQuality = false;
     const step4PixelArray = getPixelArrayFromCanvas(step4Canvas);
     const resultImage = isBleedthroughEnabled()
         ? revertDarkenedImage(step4PixelArray, getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((c) => c.hex)))
