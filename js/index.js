@@ -2510,7 +2510,8 @@ async function generateInstructionsAsBlob() {
 async function _generateBlobFromStep4() {
     const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
 
-    const isHighQuality = document.getElementById("high-quality-instructions-check").checked;
+    // Always upload in high quality — this is the printable copy delivered with the kit.
+    const isHighQuality = true;
     const step4PixelArray = getPixelArrayFromCanvas(step4Canvas);
     const resultImage = isBleedthroughEnabled()
         ? revertDarkenedImage(step4PixelArray, getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((c) => c.hex)))
@@ -3378,27 +3379,21 @@ if (orderMosaicBtn) {
                 console.error('[BRICKONAS] Email error:', emailErr);
             }
 
-            // NEW: If uploader is enabled, generate PDF + upload first, then attach token to cart message
+            // If uploader is enabled, generate PDF + upload silently in background.
+            // No status text — user just sees the standard "added to cart" feedback.
             var mosaicToken = null;
             var uploaderCfg = await getMosaicUploaderConfig();
             console.log('[BRICKONAS] Uploader config:', uploaderCfg);
             if (uploaderCfg && uploaderCfg.enabled) {
-                if (statusEl) {
-                    statusEl.className = 'mosaic-order-status';
-                    statusEl.innerHTML = 'Anleitung wird erstellt... Bitte warten.';
-                }
                 try {
-                    console.log('[BRICKONAS] Generating PDF blob...');
+                    console.log('[BRICKONAS] Generating PDF blob (high quality)...');
                     var blob = await generateInstructionsAsBlob();
                     console.log('[BRICKONAS] PDF blob generated, size:', blob.size, 'bytes');
-                    if (statusEl) {
-                        statusEl.innerHTML = 'Anleitung wird hochgeladen...';
-                    }
-                    mosaicToken = await uploadMosaicPdfToServer(blob, statusEl);
-                    if (!mosaicToken) {
-                        console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
-                    } else {
+                    mosaicToken = await uploadMosaicPdfToServer(blob, null);
+                    if (mosaicToken) {
                         console.log('[BRICKONAS] PDF uploaded successfully, token:', mosaicToken);
+                    } else {
+                        console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
                     }
                 } catch (genErr) {
                     console.error('[BRICKONAS] PDF generation/upload failed:', genErr);
@@ -3477,30 +3472,14 @@ if (orderMosaicBtn) {
             }
             if (e.data.type === 'mosaic-email-result') {
                 console.log('[BRICKONAS] Email result:', e.data.success);
-                var statusEl = document.getElementById('mosaic-order-status');
-                if (statusEl) {
-                    statusEl.className = 'mosaic-order-status';
-                    if (e.data.success) {
-                        statusEl.classList.add('bk-sent');
-                        statusEl.innerHTML = '\u2713 ' + t('orderEmailSent');
-                        setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
-                    } else {
-                        statusEl.classList.add('bk-error');
-                        statusEl.innerHTML = '\u26A0 ' + t('orderEmailError');
-                        setTimeout(function() { statusEl.className = 'mosaic-order-status'; }, 5000);
-                    }
-                }
+                // Silent — no status text shown to customer
             }
         }
     });
 }
 
-// Send mosaic order details to parent WP page for email
+// Send mosaic order details to parent WP page for email (silent — no status text shown)
 function sendMosaicOrderEmail(statusEl) {
-    if (statusEl) {
-        statusEl.className = 'mosaic-order-status bk-sending';
-        statusEl.innerHTML = '\u23F3 ' + t('orderEmailSending');
-    }
     var data = collectMosaicOrderData();
     if (window.self !== window.top) {
         // In iframe: tell parent to send the email
