@@ -329,7 +329,6 @@ const colorTranslations = {
         "Bright Light Yellow": "Leuchtend Hellgelb",
         "Light Yellow": "Hellgelb",
         "Light Lime": "Hell Limone",
-        "Yellowish Green": "Gelbgrün",
         "Neon Green": "Neongrün",
         "Medium Lime": "Mittel Limone",
         "Lime": "Limone",

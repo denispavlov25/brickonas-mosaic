@@ -200,11 +200,6 @@ let ALL_BRICKLINK_SOLID_COLORS = [
         id: 35,
     },
     {
-        name: "Yellowish Green",
-        hex: "#dfeea5",
-        id: 158,
-    },
-    {
         name: "Neon Green",
         hex: "#bcef66",
         id: 166,
@@ -493,7 +488,6 @@ const KNOWN_BRICKLINK_STUD_COLOR_NAMES = [
     "Tan",
     "White",
     "Yellow",
-    "Yellowish Green",
     "Trans-Black",
     "Trans-Bright Green",
     "Trans-Clear",
@@ -580,7 +574,6 @@ const KNOWN_BRICKLINK_TILE_COLOR_NAMES = [
     "Bright Light Yellow", // manually added from art project
     "Bright Green", // manually added from art project
     "Dark Turquoise", // manually added from dots
-    "Yellowish Green", // manually added from dots
 ];
 
 const BRICKLINK_STUD_COLORS = ALL_BRICKLINK_SOLID_COLORS.filter((color) =>
