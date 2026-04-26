@@ -2510,8 +2510,8 @@ async function generateInstructionsAsBlob() {
 async function _generateBlobFromStep4() {
     const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
 
-    // Standard quality — keeps PDF size + upload time reasonable for customers.
-    const isHighQuality = false;
+    // Always upload in high quality — this is the printable copy delivered with the kit.
+    const isHighQuality = true;
     const step4PixelArray = getPixelArrayFromCanvas(step4Canvas);
     const resultImage = isBleedthroughEnabled()
         ? revertDarkenedImage(step4PixelArray, getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((c) => c.hex)))
@@ -3379,19 +3379,28 @@ if (orderMosaicBtn) {
                 console.error('[BRICKONAS] Email error:', emailErr);
             }
 
-            // If uploader is enabled, generate PDF + upload silently in background.
-            // No status text — user just sees the standard "added to cart" feedback.
+            // If uploader is enabled, generate PDF + upload (with progress status)
             var mosaicToken = null;
             var uploaderCfg = await getMosaicUploaderConfig();
             console.log('[BRICKONAS] Uploader config:', uploaderCfg);
             if (uploaderCfg && uploaderCfg.enabled) {
                 try {
+                    if (statusEl) {
+                        statusEl.className = 'mosaic-order-status bk-sending';
+                        statusEl.innerHTML = '⏳ Anleitung wird vorbereitet... Bitte schlie&szlig;e die Seite nicht.';
+                    }
                     console.log('[BRICKONAS] Generating PDF blob (high quality)...');
                     var blob = await generateInstructionsAsBlob();
                     console.log('[BRICKONAS] PDF blob generated, size:', blob.size, 'bytes');
+                    if (statusEl) {
+                        statusEl.innerHTML = '⏳ Anleitung wird hochgeladen...';
+                    }
                     mosaicToken = await uploadMosaicPdfToServer(blob, null);
                     if (mosaicToken) {
                         console.log('[BRICKONAS] PDF uploaded successfully, token:', mosaicToken);
+                        if (statusEl) {
+                            statusEl.innerHTML = '⏳ Wird zum Warenkorb hinzugef&uuml;gt...';
+                        }
                     } else {
                         console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
                     }
@@ -3465,6 +3474,9 @@ if (orderMosaicBtn) {
                 if (!btn) return;
                 btn.disabled = false;
                 btn.classList.remove('bk-adding');
+                // Clear status text once added to cart (success or fail)
+                var statusElCart = document.getElementById('mosaic-order-status');
+                if (statusElCart) statusElCart.className = 'mosaic-order-status';
                 if (e.data.success) {
                     btn.classList.add('bk-added');
                     setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
