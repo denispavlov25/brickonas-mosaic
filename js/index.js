@@ -2529,11 +2529,19 @@ async function _generateBlobFromStep4() {
         selectedPixelPartNumber, PIXEL_WIDTH_CM);
     setDPI(titlePageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
 
-    // Use JPEG (quality 0.92) instead of PNG for the embedded images.
-    // PNG is lossless but produces enormous PDFs at high resolutions (300+ MB).
-    // JPEG @ 0.92 is visually indistinguishable for printed instructions but ~10x smaller.
-    const JPEG_QUALITY = 0.92;
-    const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY);
+    // Adaptive JPEG quality based on mosaic size:
+    // - Small mosaics (≤96): use 0.96 — file is small anyway, prioritize quality
+    // - Medium (≤192): 0.92 — balanced
+    // - Large (≥192): 0.88 — needed to stay under 120 MB upload limit
+    // The title page (overview) gets higher quality since that's what you see at-a-glance.
+    const totalNoppen = targetResolution[0] * targetResolution[1];
+    const JPEG_QUALITY_PAGES = totalNoppen <= 96 * 96 ? 0.96
+                             : totalNoppen <= 192 * 192 ? 0.92
+                             : 0.88;
+    const JPEG_QUALITY_TITLE = totalNoppen <= 96 * 96 ? 0.97
+                             : totalNoppen <= 192 * 192 ? 0.95
+                             : 0.93; // title gets a quality bonus — it's the showpiece
+    const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_TITLE);
     let pdf = new jsPDF({
         orientation: titlePageCanvas.width < titlePageCanvas.height ? "p" : "l",
         unit: "mm",
@@ -2557,7 +2565,7 @@ async function _generateBlobFromStep4() {
         generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, SCALING_FACTOR,
             instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
         setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
-        const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY);
+        const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
         pdf.addImage(pageImgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width);
         instructionPageCanvas.width = 0;
         instructionPageCanvas.height = 0;
