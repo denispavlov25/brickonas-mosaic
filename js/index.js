@@ -2453,15 +2453,37 @@ function setDPI(canvas, dpi) {
 }
 
 // === BRICKONAS PDF UPLOAD INTEGRATION ===
-// Returns config from parent window if uploader plugin is enabled, else null.
-function getMosaicUploaderConfig() {
+// Cross-origin parent: we cannot read window.parent.BK_MOSAIC_UPLOADER directly.
+// Instead, the parent page injects the config via a postMessage on iframe load,
+// or we fetch the config directly from the WordPress REST endpoint.
+let _bkUploaderConfig = null;
+
+async function getMosaicUploaderConfig() {
+    if (_bkUploaderConfig !== null) return _bkUploaderConfig === false ? null : _bkUploaderConfig;
     try {
-        if (window.parent && window.parent !== window && window.parent.BK_MOSAIC_UPLOADER) {
-            return window.parent.BK_MOSAIC_UPLOADER;
+        // Hard-coded brickonas.info — the configurator is only embedded on this domain.
+        const res = await fetch('https://brickonas.info/wp-json/bk-mosaic/v1/status', {
+            method: 'GET',
+            credentials: 'omit',
+            cache: 'no-store',
+        });
+        if (!res.ok) {
+            _bkUploaderConfig = false;
+            return null;
         }
-    } catch (e) {
-        // cross-origin: cannot read parent
+        const data = await res.json();
+        if (data && data.enabled) {
+            _bkUploaderConfig = {
+                enabled: true,
+                initUrl: 'https://brickonas.info/wp-json/bk-mosaic/v1/init-upload',
+                uploadUrl: 'https://brickonas.info/wp-json/bk-mosaic/v1/upload-pdf',
+            };
+            return _bkUploaderConfig;
+        }
+    } catch (err) {
+        console.warn('[BRICKONAS] Could not fetch uploader status:', err);
     }
+    _bkUploaderConfig = false;
     return null;
 }
 
@@ -2524,7 +2546,7 @@ async function generateInstructionsAsBlob() {
 
 // Upload PDF blob to WordPress, returns token on success, or null on failure.
 async function uploadMosaicPdfToServer(blob, statusEl) {
-    const cfg = getMosaicUploaderConfig();
+    const cfg = await getMosaicUploaderConfig();
     if (!cfg || !cfg.enabled) return null;
     try {
         if (statusEl) {
@@ -3341,17 +3363,25 @@ if (orderMosaicBtn) {
 
             // NEW: If uploader is enabled, generate PDF + upload first, then attach token to cart message
             var mosaicToken = null;
-            var uploaderCfg = getMosaicUploaderConfig();
+            var uploaderCfg = await getMosaicUploaderConfig();
+            console.log('[BRICKONAS] Uploader config:', uploaderCfg);
             if (uploaderCfg && uploaderCfg.enabled) {
                 if (statusEl) {
                     statusEl.className = 'mosaic-order-status';
                     statusEl.innerHTML = 'Anleitung wird erstellt... Bitte warten.';
                 }
                 try {
+                    console.log('[BRICKONAS] Generating PDF blob...');
                     var blob = await generateInstructionsAsBlob();
+                    console.log('[BRICKONAS] PDF blob generated, size:', blob.size, 'bytes');
+                    if (statusEl) {
+                        statusEl.innerHTML = 'Anleitung wird hochgeladen...';
+                    }
                     mosaicToken = await uploadMosaicPdfToServer(blob, statusEl);
                     if (!mosaicToken) {
                         console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
+                    } else {
+                        console.log('[BRICKONAS] PDF uploaded successfully, token:', mosaicToken);
                     }
                 } catch (genErr) {
                     console.error('[BRICKONAS] PDF generation/upload failed:', genErr);
