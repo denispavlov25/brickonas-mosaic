@@ -2524,8 +2524,12 @@ async function _generateBlobFromStep4() {
         .filter((h) => (studMap[h] || 0) > 0)
         .filter((item, pos, self) => self.indexOf(item) === pos);
 
+    // Use a higher scaling factor for the title page so it's sharp even for large mosaics.
+    // The global SCALING_FACTOR is capped to keep on-screen canvases ≤4096px (mobile).
+    // For PDF-only the canvas can be larger; we use min 25, max 40.
+    const TITLE_SCALING = Math.max(25, Math.min(40, BASE_SCALING_FACTOR));
     generateInstructionTitlePage(resultImage, targetResolution[0], PLATE_WIDTH, PLATE_HEIGHT,
-        filteredAvailableStudHexList, SCALING_FACTOR, step4CanvasUpscaled, titlePageCanvas,
+        filteredAvailableStudHexList, TITLE_SCALING, step4CanvasUpscaled, titlePageCanvas,
         selectedPixelPartNumber, PIXEL_WIDTH_CM);
     setDPI(titlePageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
 
@@ -2572,6 +2576,10 @@ async function _generateBlobFromStep4() {
     pdf.addImage(imgData, "JPEG", titleX, titleY, titleW, titleH);
     titlePageCanvas.remove();
 
+    // For instruction pages, force max scaling factor regardless of mosaic size.
+    // Each plate page is only 16x16 studs, so canvas is 16*40=640px max — safe on mobile.
+    // This ensures plate pages are sharp even for large mosaics where global SCALING_FACTOR drops.
+    const PRINT_SCALING = 40;
     for (var i = 0; i < totalPlates; i++) {
         await sleep(10);
         pdf.addPage();
@@ -2582,7 +2590,7 @@ async function _generateBlobFromStep4() {
         const variablePixelPieceDimensionsForPage = step3VariablePixelPieceDimensions == null
             ? null
             : getSubPixelMatrix(step3VariablePixelPieceDimensions, col * PLATE_WIDTH, row * PLATE_WIDTH, PLATE_WIDTH, PLATE_WIDTH);
-        generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, SCALING_FACTOR,
+        generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, PRINT_SCALING,
             instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
         setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
         const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
