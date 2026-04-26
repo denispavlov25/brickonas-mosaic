@@ -2542,17 +2542,14 @@ async function _generateBlobFromStep4() {
                              : totalNoppen <= 192 * 192 ? 0.95
                              : 0.93; // title gets a quality bonus — it's the showpiece
     // Enforce a minimum page size so large mosaics don't get tiny pages.
-    // A4 is 210x297mm, A3 is 297x420mm. We use a generous 420x540mm so
-    // print quality stays high for any mosaic size.
-    const MIN_PAGE_W = 420;
-    const MIN_PAGE_H = 540;
-    let pageW = Math.max(titlePageCanvas.width, MIN_PAGE_W);
-    let pageH = Math.max(titlePageCanvas.height, MIN_PAGE_H);
-    // Keep title aspect ratio if larger than min
-    if (titlePageCanvas.width > MIN_PAGE_W || titlePageCanvas.height > MIN_PAGE_H) {
-        pageW = titlePageCanvas.width;
-        pageH = titlePageCanvas.height;
-    }
+    // A4 is 210x297mm, A3 is 297x420mm. We use 1000x1000mm (1m square) so
+    // print quality stays high for any mosaic size — instructions are clearly
+    // readable when printed.
+    const MIN_PAGE_W = 1000;
+    const MIN_PAGE_H = 1000;
+    // Always at least 1m × 1m — never use the canvas size if it's smaller.
+    const pageW = Math.max(titlePageCanvas.width, MIN_PAGE_W);
+    const pageH = Math.max(titlePageCanvas.height, MIN_PAGE_H);
     const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_TITLE);
     let pdf = new jsPDF({
         orientation: pageW < pageH ? "p" : "l",
