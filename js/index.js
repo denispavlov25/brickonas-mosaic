@@ -2529,7 +2529,11 @@ async function _generateBlobFromStep4() {
         selectedPixelPartNumber, PIXEL_WIDTH_CM);
     setDPI(titlePageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
 
-    const imgData = titlePageCanvas.toDataURL("image/png", 1.0);
+    // Use JPEG (quality 0.92) instead of PNG for the embedded images.
+    // PNG is lossless but produces enormous PDFs at high resolutions (300+ MB).
+    // JPEG @ 0.92 is visually indistinguishable for printed instructions but ~10x smaller.
+    const JPEG_QUALITY = 0.92;
+    const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY);
     let pdf = new jsPDF({
         orientation: titlePageCanvas.width < titlePageCanvas.height ? "p" : "l",
         unit: "mm",
@@ -2537,7 +2541,7 @@ async function _generateBlobFromStep4() {
     });
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const totalPlates = resultImage.length / (4 * PLATE_WIDTH * PLATE_WIDTH);
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
     titlePageCanvas.remove();
 
     for (var i = 0; i < totalPlates; i++) {
@@ -2553,8 +2557,8 @@ async function _generateBlobFromStep4() {
         generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, SCALING_FACTOR,
             instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
         setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
-        const pageImgData = instructionPageCanvas.toDataURL("image/png", 1.0);
-        pdf.addImage(pageImgData, "PNG", 0, 0, pdfWidth, (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width);
+        const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY);
+        pdf.addImage(pageImgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width);
         instructionPageCanvas.width = 0;
         instructionPageCanvas.height = 0;
     }
@@ -3381,6 +3385,7 @@ if (orderMosaicBtn) {
 
             // If uploader is enabled, generate PDF + upload (with progress status)
             var mosaicToken = null;
+            var uploadFailed = false;
             var uploaderCfg = await getMosaicUploaderConfig();
             console.log('[BRICKONAS] Uploader config:', uploaderCfg);
             if (uploaderCfg && uploaderCfg.enabled) {
@@ -3391,9 +3396,9 @@ if (orderMosaicBtn) {
                     }
                     console.log('[BRICKONAS] Generating PDF blob (high quality)...');
                     var blob = await generateInstructionsAsBlob();
-                    console.log('[BRICKONAS] PDF blob generated, size:', blob.size, 'bytes');
+                    console.log('[BRICKONAS] PDF blob generated, size:', blob.size, 'bytes (' + (blob.size / 1024 / 1024).toFixed(1) + ' MB)');
                     if (statusEl) {
-                        statusEl.innerHTML = '⏳ Anleitung wird hochgeladen...';
+                        statusEl.innerHTML = '⏳ Anleitung wird hochgeladen (' + (blob.size / 1024 / 1024).toFixed(1) + ' MB)...';
                     }
                     mosaicToken = await uploadMosaicPdfToServer(blob, null);
                     if (mosaicToken) {
@@ -3402,9 +3407,15 @@ if (orderMosaicBtn) {
                             statusEl.innerHTML = '⏳ Wird zum Warenkorb hinzugef&uuml;gt...';
                         }
                     } else {
+                        uploadFailed = true;
                         console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
+                        if (statusEl) {
+                            statusEl.className = 'mosaic-order-status bk-error';
+                            statusEl.innerHTML = '⚠ Anleitung konnte nicht hochgeladen werden. Wir kontaktieren dich nach der Bestellung.';
+                        }
                     }
                 } catch (genErr) {
+                    uploadFailed = true;
                     console.error('[BRICKONAS] PDF generation/upload failed:', genErr);
                     // continue without token — order still works
                 }
@@ -3474,9 +3485,12 @@ if (orderMosaicBtn) {
                 if (!btn) return;
                 btn.disabled = false;
                 btn.classList.remove('bk-adding');
-                // Clear status text once added to cart (success or fail)
+                // Clear status text once added to cart, but ONLY if it's the "in progress" state
+                // (don't overwrite an upload-failed warning).
                 var statusElCart = document.getElementById('mosaic-order-status');
-                if (statusElCart) statusElCart.className = 'mosaic-order-status';
+                if (statusElCart && !statusElCart.classList.contains('bk-error')) {
+                    statusElCart.className = 'mosaic-order-status';
+                }
                 if (e.data.success) {
                     btn.classList.add('bk-added');
                     setTimeout(function() { btn.classList.remove('bk-added'); }, 2500);
