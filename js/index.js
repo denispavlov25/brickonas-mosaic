@@ -2493,6 +2493,23 @@ async function generateInstructionsAsBlob() {
     instructionsCanvasContainer.innerHTML = "";
     updatePlateDimensions();
 
+    // step4Canvas is not auto-populated until runStep4 is called.
+    // Wrap the full generation in runStep4 to ensure all pixel data is ready.
+    return new Promise((resolve, reject) => {
+        runStep4(async () => {
+            try {
+                const blob = await _generateBlobFromStep4();
+                resolve(blob);
+            } catch (err) {
+                reject(err);
+            }
+        });
+    });
+}
+
+async function _generateBlobFromStep4() {
+    const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
+
     const isHighQuality = document.getElementById("high-quality-instructions-check").checked;
     const step4PixelArray = getPixelArrayFromCanvas(step4Canvas);
     const resultImage = isBleedthroughEnabled()
