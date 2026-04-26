@@ -2452,6 +2452,109 @@ function setDPI(canvas, dpi) {
     ctx.setTransform(scaleFactor, 0, 0, scaleFactor, 0, 0);
 }
 
+// === BRICKONAS PDF UPLOAD INTEGRATION ===
+// Returns config from parent window if uploader plugin is enabled, else null.
+function getMosaicUploaderConfig() {
+    try {
+        if (window.parent && window.parent !== window && window.parent.BK_MOSAIC_UPLOADER) {
+            return window.parent.BK_MOSAIC_UPLOADER;
+        }
+    } catch (e) {
+        // cross-origin: cannot read parent
+    }
+    return null;
+}
+
+// Generate PDF as Blob (same logic as download flow but returns blob instead of saving).
+async function generateInstructionsAsBlob() {
+    const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
+    instructionsCanvasContainer.innerHTML = "";
+    updatePlateDimensions();
+
+    const isHighQuality = document.getElementById("high-quality-instructions-check").checked;
+    const step4PixelArray = getPixelArrayFromCanvas(step4Canvas);
+    const resultImage = isBleedthroughEnabled()
+        ? revertDarkenedImage(step4PixelArray, getDarkenedStudsToStuds(ALL_BRICKLINK_SOLID_COLORS.map((c) => c.hex)))
+        : step4PixelArray;
+
+    const titlePageCanvas = document.createElement("canvas");
+    instructionsCanvasContainer.appendChild(titlePageCanvas);
+    const studMap = getUsedPixelsStudMap(resultImage);
+    const filteredAvailableStudHexList = selectedSortedStuds
+        .filter((h) => (studMap[h] || 0) > 0)
+        .filter((item, pos, self) => self.indexOf(item) === pos);
+
+    generateInstructionTitlePage(resultImage, targetResolution[0], PLATE_WIDTH, PLATE_HEIGHT,
+        filteredAvailableStudHexList, SCALING_FACTOR, step4CanvasUpscaled, titlePageCanvas,
+        selectedPixelPartNumber, PIXEL_WIDTH_CM);
+    setDPI(titlePageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
+
+    const imgData = titlePageCanvas.toDataURL("image/png", 1.0);
+    let pdf = new jsPDF({
+        orientation: titlePageCanvas.width < titlePageCanvas.height ? "p" : "l",
+        unit: "mm",
+        format: [titlePageCanvas.width, titlePageCanvas.height],
+    });
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const totalPlates = resultImage.length / (4 * PLATE_WIDTH * PLATE_WIDTH);
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
+    titlePageCanvas.remove();
+
+    for (var i = 0; i < totalPlates; i++) {
+        await sleep(10);
+        pdf.addPage();
+        const instructionPageCanvas = document.createElement("canvas");
+        const subPixelArray = getSubPixelArray(resultImage, i, targetResolution[0], PLATE_WIDTH);
+        const row = Math.floor((i * PLATE_WIDTH) / targetResolution[0]);
+        const col = i % (targetResolution[0] / PLATE_WIDTH);
+        const variablePixelPieceDimensionsForPage = step3VariablePixelPieceDimensions == null
+            ? null
+            : getSubPixelMatrix(step3VariablePixelPieceDimensions, col * PLATE_WIDTH, row * PLATE_WIDTH, PLATE_WIDTH, PLATE_WIDTH);
+        generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, SCALING_FACTOR,
+            instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
+        setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
+        const pageImgData = instructionPageCanvas.toDataURL("image/png", 1.0);
+        pdf.addImage(pageImgData, "PNG", 0, 0, pdfWidth, (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width);
+        instructionPageCanvas.width = 0;
+        instructionPageCanvas.height = 0;
+    }
+    addWaterMark(pdf, isHighQuality);
+    return pdf.output("blob");
+}
+
+// Upload PDF blob to WordPress, returns token on success, or null on failure.
+async function uploadMosaicPdfToServer(blob, statusEl) {
+    const cfg = getMosaicUploaderConfig();
+    if (!cfg || !cfg.enabled) return null;
+    try {
+        if (statusEl) {
+            statusEl.className = 'mosaic-order-status';
+            statusEl.innerHTML = 'Anleitung wird vorbereitet...';
+        }
+        const initRes = await fetch(cfg.initUrl, { method: 'POST' });
+        if (!initRes.ok) throw new Error('init failed: ' + initRes.status);
+        const initData = await initRes.json();
+        const token = initData.token;
+        if (!token) throw new Error('no token returned');
+
+        const fd = new FormData();
+        fd.append('token', token);
+        fd.append('file', blob, 'mosaik-anleitung.pdf');
+        const upRes = await fetch(cfg.uploadUrl, { method: 'POST', body: fd });
+        if (!upRes.ok) {
+            const text = await upRes.text();
+            throw new Error('upload failed ' + upRes.status + ': ' + text.substring(0, 200));
+        }
+        const upData = await upRes.json();
+        if (!upData.success) throw new Error('upload not successful');
+        console.log('[BRICKONAS] PDF uploaded, token:', token, 'size:', upData.size);
+        return token;
+    } catch (err) {
+        console.error('[BRICKONAS] PDF upload error:', err);
+        return null;
+    }
+}
+
 async function generateInstructions() {
     const instructionsCanvasContainer = document.getElementById("instructions-canvas-container");
     instructionsCanvasContainer.innerHTML = "";
@@ -3222,7 +3325,7 @@ function getMosaicProductId() {
     return MOSAIC_WC_PRODUCT_48x48;
 }
 if (orderMosaicBtn) {
-    orderMosaicBtn.addEventListener('click', function() {
+    orderMosaicBtn.addEventListener('click', async function() {
         console.log('[BRICKONAS] Bestellen button clicked');
         var statusEl = document.getElementById('mosaic-order-status');
         var btn = this;
@@ -3236,12 +3339,33 @@ if (orderMosaicBtn) {
                 console.error('[BRICKONAS] Email error:', emailErr);
             }
 
-            // Tell parent WordPress page to add product to cart
-            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', getMosaicProductId());
+            // NEW: If uploader is enabled, generate PDF + upload first, then attach token to cart message
+            var mosaicToken = null;
+            var uploaderCfg = getMosaicUploaderConfig();
+            if (uploaderCfg && uploaderCfg.enabled) {
+                if (statusEl) {
+                    statusEl.className = 'mosaic-order-status';
+                    statusEl.innerHTML = 'Anleitung wird erstellt... Bitte warten.';
+                }
+                try {
+                    var blob = await generateInstructionsAsBlob();
+                    mosaicToken = await uploadMosaicPdfToServer(blob, statusEl);
+                    if (!mosaicToken) {
+                        console.warn('[BRICKONAS] PDF upload failed, proceeding to cart without token');
+                    }
+                } catch (genErr) {
+                    console.error('[BRICKONAS] PDF generation/upload failed:', genErr);
+                    // continue without token — order still works
+                }
+            }
+
+            // Tell parent WordPress page to add product to cart (with optional PDF token)
+            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', getMosaicProductId(), 'token:', mosaicToken);
             if (window.self !== window.top) {
                 window.parent.postMessage({
                     type: 'mosaic-add-to-cart',
-                    productId: getMosaicProductId()
+                    productId: getMosaicProductId(),
+                    mosaicToken: mosaicToken
                 }, '*');
             } else {
                 // Standalone fallback: add to cart directly
