@@ -3411,18 +3411,70 @@ function collectMosaicOrderData() {
     };
 }
 
-// Order mosaic button — adds WooCommerce product to cart
+// Order mosaic button — adds WooCommerce variation to cart
 var orderMosaicBtn = document.getElementById('order-mosaic-button');
-// Product IDs per mosaic size
-var MOSAIC_WC_PRODUCT_48x48 = 582;  // 48x48 Noppen, 16er Platten → 69,99€
-var MOSAIC_WC_PRODUCT_32x32 = 664;  // 32x32 Noppen, 32er Platten → 39,99€
-function getMosaicProductId() {
+
+// WooCommerce variable product (parent) and lookup of all 40 variations.
+// Each entry: <plateType>_<W>x<H>: { vid, price }
+var MOSAIC_PARENT_PRODUCT_ID = 866; // BRICKONAS Mosaik nach Maß (variable)
+var MOSAIC_VARIATIONS = {
+    '32er_32x32':   { vid: 867, price: '39,00' },
+    '32er_32x64':   { vid: 868, price: '59,00' },
+    '32er_64x32':   { vid: 869, price: '59,00' },
+    '32er_64x64':   { vid: 870, price: '109,00' },
+    '48er_48x48':   { vid: 871, price: '69,00' },
+    '48er_48x96':   { vid: 872, price: '109,00' },
+    '48er_48x144':  { vid: 873, price: '154,00' },
+    '48er_48x192':  { vid: 874, price: '199,00' },
+    '48er_48x240':  { vid: 875, price: '288,00' },
+    '48er_48x288':  { vid: 876, price: '346,00' },
+    '48er_96x48':   { vid: 877, price: '109,00' },
+    '48er_96x96':   { vid: 878, price: '199,00' },
+    '48er_96x144':  { vid: 879, price: '289,00' },
+    '48er_96x192':  { vid: 880, price: '379,00' },
+    '48er_96x240':  { vid: 881, price: '576,00' },
+    '48er_96x288':  { vid: 882, price: '691,00' },
+    '48er_144x48':  { vid: 883, price: '154,00' },
+    '48er_144x96':  { vid: 884, price: '289,00' },
+    '48er_144x144': { vid: 885, price: '518,00' },
+    '48er_144x192': { vid: 886, price: '691,00' },
+    '48er_144x240': { vid: 887, price: '864,00' },
+    '48er_144x288': { vid: 888, price: '1037,00' },
+    '48er_192x48':  { vid: 889, price: '199,00' },
+    '48er_192x96':  { vid: 890, price: '379,00' },
+    '48er_192x144': { vid: 891, price: '691,00' },
+    '48er_192x192': { vid: 892, price: '922,00' },
+    '48er_192x240': { vid: 893, price: '1152,00' },
+    '48er_192x288': { vid: 894, price: '1382,00' },
+    '48er_240x48':  { vid: 895, price: '288,00' },
+    '48er_240x96':  { vid: 896, price: '576,00' },
+    '48er_240x144': { vid: 897, price: '864,00' },
+    '48er_240x192': { vid: 898, price: '1152,00' },
+    '48er_240x240': { vid: 899, price: '1440,00' },
+    '48er_240x288': { vid: 900, price: '1728,00' },
+    '48er_288x48':  { vid: 901, price: '346,00' },
+    '48er_288x96':  { vid: 902, price: '691,00' },
+    '48er_288x144': { vid: 903, price: '1037,00' },
+    '48er_288x192': { vid: 904, price: '1382,00' },
+    '48er_288x240': { vid: 905, price: '1728,00' },
+    '48er_288x288': { vid: 906, price: '2074,00' }
+};
+
+function getMosaicVariationKey() {
     var w = Number(targetResolution[0]);
     var h = Number(targetResolution[1]);
-    var pw = PLATE_WIDTH;
-    var ph = PLATE_HEIGHT;
-    if (w === 32 && h === 32 && pw === 32 && ph === 32) return MOSAIC_WC_PRODUCT_32x32;
-    return MOSAIC_WC_PRODUCT_48x48;
+    var plate = PLATE_WIDTH === 32 ? '32er' : '48er';
+    return plate + '_' + w + 'x' + h;
+}
+
+function getMosaicVariationInfo() {
+    return MOSAIC_VARIATIONS[getMosaicVariationKey()] || null;
+}
+
+function getMosaicProductId() {
+    // Returns the parent variable product ID (used for the WC add-to-cart endpoint).
+    // The specific variation is identified separately via variation_id + attributes.
+    return MOSAIC_PARENT_PRODUCT_ID;
 }
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', async function() {
@@ -3477,19 +3529,32 @@ if (orderMosaicBtn) {
                 }
             }
 
-            // Tell parent WordPress page to add product to cart (with optional PDF token)
-            console.log('[BRICKONAS] Sending add-to-cart message to parent, product:', getMosaicProductId(), 'token:', mosaicToken);
+            // Tell parent WordPress page to add product (variation) to cart
+            var variationInfo = getMosaicVariationInfo();
+            var plateAttr = PLATE_WIDTH === 32 ? '32er' : '48er';
+            var resAttr = Number(targetResolution[0]) + 'x' + Number(targetResolution[1]);
+            console.log('[BRICKONAS] Sending add-to-cart message to parent. parent:', getMosaicProductId(), 'variation:', variationInfo, 'attrs:', plateAttr, resAttr, 'token:', mosaicToken);
             if (window.self !== window.top) {
                 window.parent.postMessage({
                     type: 'mosaic-add-to-cart',
                     productId: getMosaicProductId(),
+                    variationId: variationInfo ? variationInfo.vid : null,
+                    attributes: {
+                        plattentyp: plateAttr,
+                        aufloesung: resAttr
+                    },
                     mosaicToken: mosaicToken
                 }, '*');
             } else {
-                // Standalone fallback: add to cart directly
+                // Standalone fallback: add variation to cart directly
                 console.log('[BRICKONAS] Standalone mode: adding to cart via fetch');
                 var formData = new FormData();
                 formData.append('product_id', getMosaicProductId());
+                if (variationInfo) {
+                    formData.append('variation_id', variationInfo.vid);
+                    formData.append('attribute_pa_plattentyp', plateAttr);
+                    formData.append('attribute_pa_aufloesung', resAttr);
+                }
                 formData.append('quantity', 1);
                 fetch('https://brickonas.info/?wc-ajax=add_to_cart', {
                     method: 'POST',
@@ -3600,45 +3665,11 @@ function sendMosaicOrderEmail(statusEl) {
     }
 }
 
-// Prices come from URL query params injected server-side by the WP plugin
-// (BRICKONAS Mosaic Prices). Format: ?price_48x48=69,99&price_32x32=39,99
-// Fallbacks if the iframe is loaded standalone or the plugin is inactive.
-var MOSAIC_PRICE_CACHE = {
-    '582': '69,99',  // 48x48 default
-    '664': '39,99'   // 32x32
-};
-
-(function readPricesFromQuery(){
-    try {
-        var params = new URLSearchParams(window.location.search);
-        var sizes = ['48x48', '32x32'];
-        sizes.forEach(function(size){
-            var price = params.get('price_' + size);
-            var pid = params.get('pid_' + size);
-            if (price && pid) {
-                MOSAIC_PRICE_CACHE[String(pid)] = price;
-            }
-        });
-    } catch(ex) {}
-})();
-
+// Prices are baked into MOSAIC_VARIATIONS above (synced with WooCommerce variations).
 function getMosaicPrice() {
-    var productId = String(getMosaicProductId());
-    return MOSAIC_PRICE_CACHE[productId] || MOSAIC_PRICE_CACHE['582'];
+    var v = getMosaicVariationInfo();
+    return v ? v.price : '69,00';
 }
-
-// Backwards compat: still accept postMessage-based price updates
-window.addEventListener('message', function(e) {
-    if (!e.data || e.data.type !== 'mosaic-prices') return;
-    var prices = e.data.prices;
-    if (!prices) return;
-    Object.keys(prices).forEach(function(pid) {
-        if (prices[pid]) MOSAIC_PRICE_CACHE[String(pid)] = prices[pid];
-    });
-    if (typeof updateMosaicProductMeta === 'function') {
-        try { updateMosaicProductMeta(); } catch(ex) {}
-    }
-});
 
 // Update product card meta and button text when resolution changes
 function updateMosaicProductMeta() {
