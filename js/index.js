@@ -174,8 +174,8 @@ function getScalingFactor(width, height) {
 let SCALING_FACTOR = getScalingFactor(targetResolution[0], targetResolution[1]);
 
 // Plate dimensions in studs - updated dynamically based on step selectors
-let PLATE_WIDTH = 16;  // width step (plate width in studs)
-let PLATE_HEIGHT = 16; // height step (plate height in studs)
+let PLATE_WIDTH = 48;  // width step (plate width in studs)
+let PLATE_HEIGHT = 48; // height step (plate height in studs)
 
 function updatePlateDimensions() {
     PLATE_WIDTH = parseInt(document.getElementById("width-step-select").value);
@@ -401,16 +401,24 @@ document.getElementById("height-slider").addEventListener(
     false
 );
 
+// Per-plate-size max stud count (32-plates capped at 64, 48-plates full range)
+function getMaxStudsForStep(step) {
+    if (step === 32) return 64;
+    return 288;
+}
+
 // Resolution step selectors
 document.getElementById("width-step-select").addEventListener("change", () => {
     const newStep = parseInt(document.getElementById("width-step-select").value);
     const widthSlider = document.getElementById("width-slider");
+    const newMax = getMaxStudsForStep(newStep);
     widthSlider.step = newStep;
     widthSlider.min = newStep;
+    widthSlider.max = newMax;
     // Snap current value to nearest valid step
     const currentValue = parseInt(widthSlider.value);
     const snappedValue = Math.round(currentValue / newStep) * newStep;
-    const clampedValue = Math.max(newStep, Math.min(288, snappedValue));
+    const clampedValue = Math.max(newStep, Math.min(newMax, snappedValue));
     widthSlider.value = clampedValue;
     document.getElementById("width-text").innerHTML = clampedValue;
     targetResolution[0] = clampedValue;
@@ -420,12 +428,14 @@ document.getElementById("width-step-select").addEventListener("change", () => {
 document.getElementById("height-step-select").addEventListener("change", () => {
     const newStep = parseInt(document.getElementById("height-step-select").value);
     const heightSlider = document.getElementById("height-slider");
+    const newMax = getMaxStudsForStep(newStep);
     heightSlider.step = newStep;
     heightSlider.min = newStep;
+    heightSlider.max = newMax;
     // Snap current value to nearest valid step
     const currentValue = parseInt(heightSlider.value);
     const snappedValue = Math.round(currentValue / newStep) * newStep;
-    const clampedValue = Math.max(newStep, Math.min(288, snappedValue));
+    const clampedValue = Math.max(newStep, Math.min(newMax, snappedValue));
     heightSlider.value = clampedValue;
     document.getElementById("height-text").innerHTML = clampedValue;
     targetResolution[1] = clampedValue;
