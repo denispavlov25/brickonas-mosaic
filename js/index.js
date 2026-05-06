@@ -3476,6 +3476,31 @@ function getMosaicProductId() {
     // The specific variation is identified separately via variation_id + attributes.
     return MOSAIC_PARENT_PRODUCT_ID;
 }
+
+// Frame add-on (only available for 48x48 / 48er Platten)
+var FRAME_PRODUCT_ID = 908; // BRICKONAS Mosaik-Rahmen 48x48 (simple, sale 29 €)
+var FRAME_VARIATION_KEY = '48er_48x48';
+
+function isFrameEligible() {
+    return getMosaicVariationKey() === FRAME_VARIATION_KEY;
+}
+
+function isFrameSelected() {
+    var cb = document.getElementById('mosaic-frame-checkbox');
+    return !!(cb && !cb.disabled && cb.checked);
+}
+
+function updateFrameAddonVisibility() {
+    var addon = document.getElementById('mosaic-frame-addon');
+    var cb = document.getElementById('mosaic-frame-checkbox');
+    if (!addon) return;
+    if (isFrameEligible()) {
+        addon.hidden = false;
+    } else {
+        addon.hidden = true;
+        if (cb) cb.checked = false; // reset when leaving 48x48
+    }
+}
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', async function() {
         console.log('[BRICKONAS] Bestellen button clicked');
@@ -3533,7 +3558,8 @@ if (orderMosaicBtn) {
             var variationInfo = getMosaicVariationInfo();
             var plateAttr = PLATE_WIDTH === 32 ? '32er' : '48er';
             var resAttr = Number(targetResolution[0]) + 'x' + Number(targetResolution[1]);
-            console.log('[BRICKONAS] Sending add-to-cart message to parent. parent:', getMosaicProductId(), 'variation:', variationInfo, 'attrs:', plateAttr, resAttr, 'token:', mosaicToken);
+            var addFrame = isFrameEligible() && isFrameSelected();
+            console.log('[BRICKONAS] Sending add-to-cart message to parent. parent:', getMosaicProductId(), 'variation:', variationInfo, 'attrs:', plateAttr, resAttr, 'frame:', addFrame, 'token:', mosaicToken);
             if (window.self !== window.top) {
                 window.parent.postMessage({
                     type: 'mosaic-add-to-cart',
@@ -3543,6 +3569,8 @@ if (orderMosaicBtn) {
                         plattentyp: plateAttr,
                         aufloesung: resAttr
                     },
+                    addFrame: addFrame,
+                    frameProductId: addFrame ? FRAME_PRODUCT_ID : null,
                     mosaicToken: mosaicToken
                 }, '*');
             } else {
@@ -3695,6 +3723,8 @@ function updateMosaicProductMeta() {
         var svgHtml = svgIcon ? svgIcon.outerHTML : '';
         btn.innerHTML = svgHtml + '\n                        Bestellen';
     }
+    // Frame add-on is only available for 48x48 / 48er
+    if (typeof updateFrameAddonVisibility === 'function') updateFrameAddonVisibility();
 }
 
 // Stepper circle click handlers

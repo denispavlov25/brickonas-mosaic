@@ -597,6 +597,79 @@
       .mosaic-add-to-cart-btn.bk-adding::after {
         content: '...';
       }
+      .mosaic-frame-addon {
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #FFF8E1, #FFF3D6);
+        border: 1px solid #F0C870;
+        border-radius: var(--bk-radius-sm);
+        transition: all var(--bk-transition);
+      }
+      .mosaic-frame-addon:has(input:checked) {
+        background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+        border-color: var(--bk-green-primary);
+        box-shadow: 0 2px 8px rgba(46, 125, 50, 0.15);
+      }
+      .mosaic-frame-addon-label {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        cursor: pointer;
+        margin: 0;
+      }
+      .mosaic-frame-addon-label input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin: 2px 0 0 0;
+        accent-color: var(--bk-green-primary);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .mosaic-frame-addon-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+      }
+      .mosaic-frame-addon-title {
+        font-weight: 700;
+        color: #5D4037;
+        font-size: 0.95rem;
+      }
+      .mosaic-frame-addon-desc {
+        font-size: 0.82rem;
+        color: var(--bk-dark-gray);
+        line-height: 1.4;
+      }
+      .mosaic-frame-addon-price {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+      .mosaic-frame-price-old {
+        font-size: 0.85rem;
+        color: var(--bk-dark-gray);
+        text-decoration: line-through;
+      }
+      .mosaic-frame-price-new {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--bk-green-primary);
+        font-family: var(--bk-font-heading);
+      }
+      .mosaic-frame-discount-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #D32F2F;
+        color: #fff;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border-radius: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
       .mosaic-order-status {
         display: none;
         align-items: center;
@@ -1362,6 +1435,22 @@
                         Bestellen
                       </button>
                     </div>
+                    <!-- Frame add-on (only for 48x48 / 48er) -->
+                    <div class="mosaic-frame-addon" id="mosaic-frame-addon" hidden>
+                      <label class="mosaic-frame-addon-label" for="mosaic-frame-checkbox">
+                        <input type="checkbox" id="mosaic-frame-checkbox" />
+                        <span class="mosaic-frame-addon-content">
+                          <span class="mosaic-frame-addon-title" data-i18n="frameAddonTitle">Mit passendem Aluminium-Rahmen</span>
+                          <span class="mosaic-frame-addon-desc" data-i18n="frameAddonDesc">Eleganter Rahmen f&uuml;r dein 48&times;48 Mosaik (38,4 &times; 38,4 cm) &mdash; perfekt zum Aufh&auml;ngen.</span>
+                          <span class="mosaic-frame-addon-price">
+                            <span class="mosaic-frame-price-old">39,00 &euro;</span>
+                            <span class="mosaic-frame-price-new">29,00 &euro;</span>
+                            <span class="mosaic-frame-discount-badge" data-i18n="frameAddonBundle">Bundle &minus;10 &euro;</span>
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+
                     <div class="mosaic-order-status" id="mosaic-order-status"></div>
                     <div class="mosaic-order-hint" id="mosaic-order-hint">
                       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -1496,9 +1585,9 @@
     <script src="js/bricklink-colors.js"></script>
     <script src="js/stud-maps.js"></script>
     <script src="js/heap.js"></script>
-    <script src="js/i18n.js?v=19"></script>
+    <script src="js/i18n.js?v=20"></script>
     <script src="js/algo.js"></script>
-    <script src="js/index.js?v=19"></script>
+    <script src="js/index.js?v=20"></script>
 
     <script>
       // Notify parent iframe of height changes for dynamic resizing
