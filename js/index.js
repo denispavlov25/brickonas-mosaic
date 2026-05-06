@@ -3501,6 +3501,15 @@ function updateFrameAddonVisibility() {
         if (cb) cb.checked = false; // reset when leaving 48x48
     }
 }
+
+// Wire the checkbox to update the live price total in the order card
+(function attachFrameCheckboxHandler(){
+    var cb = document.getElementById('mosaic-frame-checkbox');
+    if (!cb) return;
+    cb.addEventListener('change', function(){
+        if (typeof updateMosaicProductMeta === 'function') updateMosaicProductMeta();
+    });
+})();
 if (orderMosaicBtn) {
     orderMosaicBtn.addEventListener('click', async function() {
         console.log('[BRICKONAS] Bestellen button clicked');
@@ -3710,10 +3719,16 @@ function updateMosaicProductMeta() {
         var total = targetResolution[0] * targetResolution[1];
         piecesEl.innerHTML = total.toLocaleString('de-DE') + ' Teile';
     }
-    // Update price based on resolution
+    // Update price based on resolution (+ frame surcharge if checkbox set)
     var priceEl = document.getElementById('mosaic-product-price');
     if (priceEl) {
-        priceEl.innerHTML = getMosaicPrice() + ' &euro;';
+        var basePrice = parseFloat(getMosaicPrice().replace('.', '').replace(',', '.')) || 0;
+        var totalPrice = basePrice;
+        if (typeof isFrameEligible === 'function' && isFrameEligible() && typeof isFrameSelected === 'function' && isFrameSelected()) {
+            totalPrice = basePrice + 29;
+        }
+        var formatted = totalPrice.toFixed(2).replace('.', ',');
+        priceEl.innerHTML = formatted + ' &euro;';
         priceEl.style.display = '';
     }
     // Update button text
