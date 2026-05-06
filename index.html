@@ -1575,11 +1575,17 @@
 
     <style>
       /* Tiny always-visible legal credit — injected as the last child of every visible .mosaic-card. */
-      .mosaic-card { display: flex; flex-direction: column; }
+      #image-input-card.mosaic-card,
+      #visual-step-1 .mosaic-card,
+      #visual-step-2 .mosaic-card,
+      #visual-step-3 .mosaic-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 480px;
+      }
       .bk-mosaic-credit-tiny {
         margin-top: auto;
-        padding: 0 8px;
-        padding-bottom: 4px;
+        padding: 12px 8px 6px;
         font-size: 8px;
         line-height: 1.25;
         color: #d8ddd8;
