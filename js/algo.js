@@ -1084,14 +1084,16 @@ function drawStudCountForContext(
 
     ctx.lineWidth = 5;
     ctx.strokeStyle = "#000000";
+    const boxLeft = horizontalOffset - leftPadding;
     ctx.beginPath();
     ctx.rect(
-        horizontalOffset - leftPadding,
+        boxLeft,
         verticalOffset + radius * 0.75,
         boxWidth,
         radius * 2.5 * (availableStudHexList.length + 0.5)
     );
     ctx.stroke();
+    return { left: boxLeft, right: boxLeft + boxWidth, width: boxWidth };
 }
 
 function generateInstructionTitlePage(
@@ -1141,7 +1143,7 @@ function generateInstructionTitlePage(
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    drawStudCountForContext(
+    const legendBox = drawStudCountForContext(
         studMap,
         availableStudHexList,
         scalingFactor,
@@ -1151,23 +1153,33 @@ function generateInstructionTitlePage(
         pixelType
     );
 
+    // Variant B layout: legend stays on the left, everything else (title, metadata,
+    // plate grid, preview image) is centered horizontally as one block in the space
+    // remaining to the right of the legend.
+    const rightBlockLeft = legendBox.right + scalingFactor * 2;
+    const rightBlockRight = canvas.width - scalingFactor;
+    const rightBlockCenterX = (rightBlockLeft + rightBlockRight) / 2;
+    const rightBlockWidth = rightBlockRight - rightBlockLeft;
+
     ctx.fillStyle = "#000000";
+    ctx.textAlign = "center";
+
     ctx.font = `${scalingFactor * 2}px Arial`;
-    ctx.fillText(t('pdfLegoMosaic'), pictureWidth * 0.75, pictureHeight * 0.28);
+    ctx.fillText(t('pdfLegoMosaic'), rightBlockCenterX, pictureHeight * 0.28);
     ctx.font = `${scalingFactor / 2}px Arial`;
     ctx.fillText(
         `${t('pdfResolution')}: ${width} x ${pixelArray.length / (4 * width)}`,
-        pictureWidth * 0.75,
+        rightBlockCenterX,
         pictureHeight * 0.34
     );
     ctx.fillText(
         `${t('pdfPlates')}: ${platesPerRow} x ${platesPerCol} (${numPlates} ${t('pdfTotal')})`,
-        pictureWidth * 0.75,
+        rightBlockCenterX,
         pictureHeight * 0.38
     );
     ctx.fillText(
         `${t('pdfPlateSize')}: ${plateWidth} x ${plateHeight}`,
-        pictureWidth * 0.75,
+        rightBlockCenterX,
         pictureHeight * 0.42
     );
     const height = pixelArray.length / (4 * width);
@@ -1175,44 +1187,47 @@ function generateInstructionTitlePage(
     const heightCm = (height * pixelWidthCm).toFixed(1);
     ctx.fillText(
         `${t('pdfSize')}: ${widthCm} x ${heightCm} cm`,
-        pictureWidth * 0.75,
+        rightBlockCenterX,
         pictureHeight * 0.46
     );
 
-    const legendHorizontalOffset = pictureWidth * 0.75;
-    const legendVerticalOffset = pictureHeight * 0.52;
+    // Reset text alignment so downstream text drawing is unaffected
+    ctx.textAlign = "start";
 
-    // Draw the numbered plate grid
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#000000";
-    ctx.font = `${legendSquareSide / 2}px Arial`;
+    // Draw the numbered plate grid — but only when there's more than one plate. A
+    // 1x1 grid is just a tiny "1" box that adds no information and clutters the page.
+    let gridDrawnHeight = 0;
+    const gridTopY = pictureHeight * 0.52;
+    if (numPlates > 1) {
+        const gridLeftX = rightBlockCenterX - (legendGridWidth / 2);
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#000000";
+        ctx.font = `${legendSquareSide / 2}px Arial`;
 
-    for (var i = 0; i < numPlates; i++) {
-        const horIndex = ((i * plateWidth) % width) / plateWidth;
-        const vertIndex = Math.floor((i * plateWidth) / width);
-        ctx.beginPath();
-        ctx.rect(
-            legendHorizontalOffset + horIndex * legendSquareSide,
-            legendVerticalOffset + vertIndex * legendSquareSide,
-            legendSquareSide,
-            legendSquareSide
-        );
-        ctx.fillText(
-            i + 1,
-            legendHorizontalOffset + (horIndex + 0.18) * legendSquareSide,
-            legendVerticalOffset + (vertIndex + 0.65) * legendSquareSide
-        );
-        ctx.stroke();
+        for (var i = 0; i < numPlates; i++) {
+            const horIndex = ((i * plateWidth) % width) / plateWidth;
+            const vertIndex = Math.floor((i * plateWidth) / width);
+            ctx.beginPath();
+            ctx.rect(
+                gridLeftX + horIndex * legendSquareSide,
+                gridTopY + vertIndex * legendSquareSide,
+                legendSquareSide,
+                legendSquareSide
+            );
+            ctx.fillText(
+                i + 1,
+                gridLeftX + (horIndex + 0.18) * legendSquareSide,
+                gridTopY + (vertIndex + 0.65) * legendSquareSide
+            );
+            ctx.stroke();
+        }
+        gridDrawnHeight = legendGridHeight + gapBetween;
     }
-    
-    // Draw the preview image BELOW the numbered grid.
-    // Size it to a sensible fraction of the page width so it stays large even for low-res
-    // single-plate mosaics (48x48 / 1 plate would otherwise render tiny). Aspect ratio is
-    // preserved from the source image, and the box is horizontally centered in the right
-    // half of the page (where the title and plate grid live).
-    const rightHalfStart = pictureWidth * 0.75;
-    const rightHalfWidth = canvas.width - rightHalfStart;
-    const previewMaxWidth = rightHalfWidth * 0.7;
+
+    // Draw the preview image, centered horizontally on the right-block axis.
+    // Sized to fit within the right block width and ~90% of pictureHeight, with the
+    // source aspect ratio preserved so it stays large even for single-plate mosaics.
+    const previewMaxWidth = rightBlockWidth * 0.95;
     const previewMaxHeight = pictureHeight * 0.9;
     const srcAspect = finalImageCanvas.width / finalImageCanvas.height;
     let previewWidth = previewMaxWidth;
@@ -1221,8 +1236,8 @@ function generateInstructionTitlePage(
         previewHeight = previewMaxHeight;
         previewWidth = previewHeight * srcAspect;
     }
-    const previewHorizontalOffset = rightHalfStart + (rightHalfWidth - previewWidth) / 2;
-    const previewVerticalOffset = legendVerticalOffset + legendGridHeight + gapBetween;
+    const previewHorizontalOffset = rightBlockCenterX - previewWidth / 2;
+    const previewVerticalOffset = gridTopY + gridDrawnHeight;
     ctx.drawImage(
         finalImageCanvas,
         0,
