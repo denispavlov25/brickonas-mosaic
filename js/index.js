@@ -3258,6 +3258,27 @@ document.getElementById("input-image-selector").addEventListener("click", () => 
     });
 })();
 
+// === Designservice button (step 2) ===
+// When clicked, ask the parent WordPress page to redirect the top-level window
+// to /kontakt/ with ref=mosaik-designservice. Falls back to a direct redirect
+// if the iframe is somehow loaded standalone.
+(function setupDesignserviceButton() {
+    var btn = document.getElementById("bk-designservice-btn");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+        var target = "/kontakt/?ref=mosaik-designservice";
+        if (window.self !== window.top) {
+            window.parent.postMessage({
+                type: "mosaic-contact-redirect",
+                ref: "mosaik-designservice",
+                subject: "Mosaik Designservice"
+            }, "*");
+        } else {
+            window.location.href = target;
+        }
+    });
+})();
+
 const depthImageSelectorHidden = document.getElementById("input-depth-image-selector-hidden");
 depthImageSelectorHidden.addEventListener("change", handleInputDepthMapImage, false);
 document.getElementById("input-depth-image-selector").addEventListener("click", () => {

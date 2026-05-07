@@ -225,6 +225,9 @@ const translations = {
         reselectInputImage: "Eingabebild erneut auswählen",
         seeAnExample: "Beispiel ansehen",
         orTryExample: "Oder probiere ein Beispielbild",
+        dsTitle: "Designservice",
+        dsDesc: "Du bist nicht zufrieden mit dem Ergebnis? Schick uns dein Foto und wir erstellen dir kostenlos einen optimierten Mosaik-Vorschlag per E-Mail.",
+        dsButton: "Designservice anfragen",
 
         // Stud map descriptions
         allStudColorsDesc: "Alle Farben, in denen Noppen (1x1 runde Platten) verfügbar sind",
