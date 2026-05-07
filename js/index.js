@@ -3840,4 +3840,167 @@ function goToStep(stepNumber) {
     }
 }
 
+// === STYLE PICKER (step 2) ===
+// Shows 5 style preset thumbnails above the pixel-edit canvas. Clicking a tile
+// reuses the existing HSV / brightness / contrast sliders to apply a stylised
+// pre-filter and re-runs the mosaic pipeline. Previews are rendered cheaply
+// via 2D canvas filters on a downscaled version of the cropped image — they
+// approximate the final look without running the full pipeline 5 times.
+(function setupStylePicker() {
+    var BK_STYLE_PRESETS = [
+        { id: "original", labelKey: "styleOriginal", labelDe: "Original",
+          hue: 0, saturation: 0, value: 0, brightness: 0, contrast: 0 },
+        { id: "dark", labelKey: "styleDark", labelDe: "Dunkel",
+          hue: 0, saturation: 10, value: -15, brightness: -15, contrast: 30 },
+        { id: "soft", labelKey: "styleSoft", labelDe: "Hell",
+          hue: 0, saturation: -15, value: 15, brightness: 20, contrast: -10 },
+        { id: "warm", labelKey: "styleWarm", labelDe: "Warm",
+          hue: 5, saturation: 15, value: 0, brightness: 5, contrast: 10 },
+        { id: "mono", labelKey: "styleMono", labelDe: "S/W",
+          hue: 0, saturation: -100, value: 0, brightness: 0, contrast: 20 },
+    ];
+
+    var picker = document.getElementById("bk-style-picker");
+    var grid = document.getElementById("bk-style-picker-grid");
+    if (!picker || !grid) return;
+
+    var selectedStyleId = "original";
+    var tilesBuilt = false;
+
+    function applyStyle(preset) {
+        document.getElementById("hue-slider").value = preset.hue;
+        document.getElementById("saturation-slider").value = preset.saturation;
+        document.getElementById("value-slider").value = preset.value;
+        document.getElementById("brightness-slider").value = preset.brightness;
+        document.getElementById("contrast-slider").value = preset.contrast;
+        // Some text spans mirror slider values — keep them in sync if present.
+        var hueText = document.getElementById("hue-text");
+        if (hueText) hueText.textContent = preset.hue;
+        var satText = document.getElementById("saturation-text");
+        if (satText) satText.textContent = preset.saturation + "%";
+        var valText = document.getElementById("value-text");
+        if (valText) valText.textContent = preset.value + "%";
+        var brText = document.getElementById("brightness-text");
+        if (brText) brText.textContent = preset.brightness;
+        var coText = document.getElementById("contrast-text");
+        if (coText) coText.textContent = preset.contrast;
+    }
+
+    function styleTo2dFilter(p) {
+        // Translate slider values to a CSS filter string so we can render
+        // cheap previews without running the mosaic pipeline. Sliders are
+        // additive (range -100..+100 mostly), CSS filter() values are
+        // multiplicative (1 = unchanged), so we map ranges by hand.
+        var saturate = 1 + (p.saturation / 100);
+        if (p.saturation <= -100) saturate = 0;
+        var br = 1 + (p.brightness / 200);   // -128..128 → roughly 0.36..1.64
+        var co = 1 + (p.contrast / 200);
+        var lighten = 1 + (p.value / 200);
+        var hue = p.hue;
+        return "saturate(" + saturate.toFixed(3) + ") " +
+               "brightness(" + (br * lighten).toFixed(3) + ") " +
+               "contrast(" + co.toFixed(3) + ") " +
+               "hue-rotate(" + hue + "deg)";
+    }
+
+    function renderTilePreviews() {
+        // Use the cropped source canvas. inputImageCropper.getCroppedCanvas()
+        // is the same call runStep2 makes, so the previews match what the
+        // user is about to see.
+        if (typeof inputImageCropper === "undefined" || !inputImageCropper) return;
+        var src;
+        try {
+            src = inputImageCropper.getCroppedCanvas({
+                width: 96, height: 96, imageSmoothingEnabled: true,
+            });
+        } catch (e) { return; }
+        if (!src) return;
+        var tiles = grid.querySelectorAll(".bk-style-tile");
+        tiles.forEach(function(tile) {
+            var preset = BK_STYLE_PRESETS.find(function(p) { return p.id === tile.dataset.style; });
+            if (!preset) return;
+            var canvas = tile.querySelector("canvas.bk-style-tile-preview");
+            if (!canvas) return;
+            canvas.width = 96; canvas.height = 96;
+            var ctx = canvas.getContext("2d");
+            ctx.filter = styleTo2dFilter(preset);
+            ctx.drawImage(src, 0, 0, 96, 96);
+            ctx.filter = "none";
+        });
+    }
+
+    function buildTilesOnce() {
+        if (tilesBuilt) return;
+        BK_STYLE_PRESETS.forEach(function(preset) {
+            var tile = document.createElement("button");
+            tile.type = "button";
+            tile.className = "bk-style-tile" + (preset.id === selectedStyleId ? " active" : "");
+            tile.dataset.style = preset.id;
+            var canvas = document.createElement("canvas");
+            canvas.className = "bk-style-tile-preview";
+            tile.appendChild(canvas);
+            var label = document.createElement("span");
+            label.className = "bk-style-tile-label";
+            label.setAttribute("data-i18n", preset.labelKey);
+            label.textContent = preset.labelDe;
+            tile.appendChild(label);
+            tile.addEventListener("click", function() {
+                if (selectedStyleId === preset.id) return;
+                selectedStyleId = preset.id;
+                grid.querySelectorAll(".bk-style-tile").forEach(function(t) {
+                    t.classList.toggle("active", t.dataset.style === preset.id);
+                });
+                applyStyle(preset);
+                if (typeof runStep2 === "function") runStep2();
+            });
+            grid.appendChild(tile);
+        });
+        tilesBuilt = true;
+    }
+
+    // Show the picker only once Step 2 is reachable (i.e. a mosaic was
+    // generated). Listen for visual-step changes via the 'create-mosaic-btn'
+    // click and the existing showVisualStep flow.
+    function refreshPicker() {
+        if (typeof currentVisualStep !== "undefined" && currentVisualStep === 2) {
+            buildTilesOnce();
+            picker.hidden = false;
+            renderTilePreviews();
+        } else {
+            picker.hidden = true;
+        }
+    }
+
+    // Hook into the visual step transitions. We can't override showVisualStep
+    // directly (defined in another scope), but we know the create-mosaic-btn
+    // and the back-to-refine paths land us on step 2.
+    document.addEventListener("DOMContentLoaded", function() {
+        var createBtn = document.getElementById("create-mosaic-btn");
+        if (createBtn) createBtn.addEventListener("click", function() {
+            // runStepProcessing(3) finishes asynchronously; poll briefly.
+            var tries = 0;
+            var iv = setInterval(function() {
+                tries++;
+                if (typeof currentVisualStep !== "undefined" && currentVisualStep === 2) {
+                    refreshPicker();
+                    clearInterval(iv);
+                } else if (tries > 40) {
+                    clearInterval(iv);
+                }
+            }, 100);
+        });
+        var backRefine = document.getElementById("back-to-refine-btn");
+        if (backRefine) backRefine.addEventListener("click", function() {
+            setTimeout(refreshPicker, 50);
+        });
+        // Also re-render previews whenever the user navigates back to step 1
+        // and re-crops, then comes forward again — handled by create-mosaic-btn
+        // path above. Hide picker on step 1/3.
+        var backToStep1 = document.getElementById("back-to-step1-btn");
+        if (backToStep1) backToStep1.addEventListener("click", function() {
+            setTimeout(refreshPicker, 50);
+        });
+    });
+})();
+
 enableInteraction(); // enable interaction once everything has loaded in
