@@ -1,3 +1,12 @@
+// Preload BRICKONAS logo for the PDF title page. Loaded eagerly so it's almost
+// always ready by the time the user reaches step 3; if it isn't, the title page
+// falls back to text rendering.
+const BRICKONAS_LOGO = (function () {
+    const img = new Image();
+    img.src = "assets/brickonas-logo.png";
+    return img;
+})();
+
 function hexToRgb(hex) {
     const hexInt = parseInt(hex.replace("#", ""), 16);
     const r = (hexInt >> 16) & 255;
@@ -1059,7 +1068,7 @@ function drawStudCountForContext(
     // Header text (also factor into width)
     const headerFontSize = countFontSize * 1.05;
     ctx.font = `bold ${headerFontSize}px Arial`;
-    const headerText = (typeof t === "function" ? (t("pdfLegendHeader") || "Farben") : "Farben");
+    const headerText = "Farben";
     const headerW = ctx.measureText(headerText).width;
 
     // Box layout: left padding + swatch (radius*2) + gap + text column + right padding.
@@ -1229,12 +1238,23 @@ function generateInstructionTitlePage(
         legendRowHeight * availableStudHexList.length +
         legendEffectiveScale * 0.6;
 
+    // Logo block (replaces text title). Height ~= titleFontSize * 1.6 to leave breathing
+    // room above/below; aspect ratio is preserved from the loaded asset (~5:2 by default).
     const titleFontSize = scalingFactor * 2;
+    const logoTargetHeight = titleFontSize * 1.6;
+    const logoLoaded = BRICKONAS_LOGO.complete && BRICKONAS_LOGO.naturalWidth > 0;
+    const logoAspect = logoLoaded ? BRICKONAS_LOGO.naturalWidth / BRICKONAS_LOGO.naturalHeight : 2.5;
+    const logoTargetWidth = logoTargetHeight * logoAspect;
+    const titleHeight = logoTargetHeight + scalingFactor * 0.5;
+
     const metaFontSize = Math.max(scalingFactor / 2, 22);
-    const titleHeight = titleFontSize * 1.4;
-    const metaLineGap = metaFontSize * 1.6;
-    const metaBlockHeight = metaLineGap * 4 + metaFontSize;
-    const titleToMetaGap = scalingFactor * 0.6;
+    const metaLineGap = metaFontSize * 1.7;
+    // Metadata is drawn as a compact 4-row card with rounded background, so the height
+    // is rows + vertical padding.
+    const metaCardPadV = metaFontSize * 0.7;
+    const metaCardPadH = metaFontSize * 1.1;
+    const metaBlockHeight = metaLineGap * 3 + metaFontSize + metaCardPadV * 2;
+    const titleToMetaGap = scalingFactor * 0.7;
     const metaToGridGap = scalingFactor * 1.2;
     const gridToPreviewGap = scalingFactor * 0.8;
 
@@ -1305,47 +1325,96 @@ function generateInstructionTitlePage(
         previewHeight;
     let cursorY = (canvas.height - finalRightBlockHeight) / 2;
 
-    // Title
-    ctx.fillStyle = "#000000";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.font = `${titleFontSize}px Arial`;
-    ctx.fillText(t('pdfLegoMosaic'), rightBlockCenterX, cursorY + titleFontSize);
+    // Title: BRICKONAS logo (falls back to plain text if the image hasn't loaded yet)
+    if (logoLoaded) {
+        ctx.drawImage(
+            BRICKONAS_LOGO,
+            rightBlockCenterX - logoTargetWidth / 2,
+            cursorY,
+            logoTargetWidth,
+            logoTargetHeight
+        );
+    } else {
+        ctx.fillStyle = "#1B5E20";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.font = `bold ${titleFontSize}px Arial`;
+        ctx.fillText("BRICKONAS", rightBlockCenterX, cursorY + titleFontSize);
+        ctx.textAlign = "start";
+    }
     cursorY += titleHeight + titleToMetaGap;
 
-    // Metadata block
-    ctx.font = `${metaFontSize}px Arial`;
-    let metaY = cursorY + metaFontSize;
-    ctx.fillText(
-        `${t('pdfResolution')}: ${width} x ${pixelArray.length / (4 * width)}`,
-        rightBlockCenterX,
-        metaY
-    );
-    metaY += metaLineGap;
-    ctx.fillText(
-        `${t('pdfPlates')}: ${platesPerRow} x ${platesPerCol} (${numPlates} ${t('pdfTotal')})`,
-        rightBlockCenterX,
-        metaY
-    );
-    metaY += metaLineGap;
-    ctx.fillText(
-        `${t('pdfPlateSize')}: ${plateWidth} x ${plateHeight}`,
-        rightBlockCenterX,
-        metaY
-    );
-    metaY += metaLineGap;
+    // Metadata card: rounded light-grey background with two-column layout
+    // (label right-aligned, value left-aligned, separated by a thin vertical line).
     const height = pixelArray.length / (4 * width);
     const widthCm = (width * pixelWidthCm).toFixed(1);
     const heightCm = (height * pixelWidthCm).toFixed(1);
-    ctx.fillText(
-        `${t('pdfSize')}: ${widthCm} x ${heightCm} cm`,
-        rightBlockCenterX,
-        metaY
-    );
-    cursorY += metaBlockHeight;
+    const metaRows = [
+        [t('pdfResolution'), `${width} × ${pixelArray.length / (4 * width)}`],
+        [t('pdfPlates'), `${platesPerRow} × ${platesPerCol} (${numPlates} ${t('pdfTotal')})`],
+        [t('pdfPlateSize'), `${plateWidth} × ${plateHeight}`],
+        [t('pdfSize'), `${widthCm} × ${heightCm} cm`],
+    ];
 
-    // Reset text alignment so downstream text drawing is unaffected
+    // Measure widest label and widest value to compute card width
+    ctx.font = `bold ${metaFontSize}px Arial`;
+    let maxLabelW = 0;
+    metaRows.forEach((row) => {
+        const w = ctx.measureText(row[0]).width;
+        if (w > maxLabelW) maxLabelW = w;
+    });
+    ctx.font = `${metaFontSize}px Arial`;
+    let maxValueW = 0;
+    metaRows.forEach((row) => {
+        const w = ctx.measureText(row[1]).width;
+        if (w > maxValueW) maxValueW = w;
+    });
+    const colSeparatorGap = metaFontSize * 1.2;
+    const metaCardWidth = metaCardPadH * 2 + maxLabelW + colSeparatorGap + maxValueW;
+    const metaCardLeft = rightBlockCenterX - metaCardWidth / 2;
+    const metaCardTop = cursorY;
+
+    // Background card
+    const metaCardRadius = Math.min(metaFontSize * 0.6, 14);
+    ctx.fillStyle = "#f7f7f7";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(metaCardLeft, metaCardTop, metaCardWidth, metaBlockHeight, metaCardRadius);
+    } else {
+        ctx.rect(metaCardLeft, metaCardTop, metaCardWidth, metaBlockHeight);
+    }
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#dddddd";
+    ctx.stroke();
+
+    // Vertical separator between label and value columns
+    const sepX = metaCardLeft + metaCardPadH + maxLabelW + colSeparatorGap / 2;
+    ctx.strokeStyle = "#dddddd";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sepX, metaCardTop + metaCardPadV * 0.6);
+    ctx.lineTo(sepX, metaCardTop + metaBlockHeight - metaCardPadV * 0.6);
+    ctx.stroke();
+
+    // Rows
+    const labelX = sepX - colSeparatorGap / 2;
+    const valueX = sepX + colSeparatorGap / 2;
+    let metaRowY = metaCardTop + metaCardPadV + metaFontSize;
+    metaRows.forEach(([label, value], i) => {
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#444444";
+        ctx.font = `bold ${metaFontSize}px Arial`;
+        ctx.textAlign = "right";
+        ctx.fillText(label, labelX, metaRowY);
+        ctx.fillStyle = "#1a1a1a";
+        ctx.font = `${metaFontSize}px Arial`;
+        ctx.textAlign = "left";
+        ctx.fillText(value, valueX, metaRowY);
+        metaRowY += metaLineGap;
+    });
     ctx.textAlign = "start";
+    cursorY += metaBlockHeight;
 
     // Plate grid (only when >1 plate) — centered on the right-block axis
     if (gridDrawn) {
