@@ -224,6 +224,7 @@ const translations = {
         selectInputImage: "Eingabebild auswählen",
         reselectInputImage: "Eingabebild erneut auswählen",
         seeAnExample: "Beispiel ansehen",
+        orTryExample: "Oder probiere ein Beispielbild",
 
         // Stud map descriptions
         allStudColorsDesc: "Alle Farben, in denen Noppen (1x1 runde Platten) verfügbar sind",

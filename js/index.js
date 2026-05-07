@@ -3206,6 +3206,71 @@ document.getElementById("input-image-selector").addEventListener("click", () => 
     imageSelectorHidden.click();
 });
 
+// === Example image picker ===
+// Loads a bundled example image and feeds it through the same handleInputImage
+// path as a user file upload, so all downstream logic (cropping, resolution
+// selection, mosaic generation) works identically.
+(function setupExampleImagePicker() {
+    var wrap = document.getElementById("mosaic-examples");
+    var grid = document.getElementById("mosaic-examples-grid");
+    if (!wrap || !grid) return;
+
+    // Per-card load probe: hide cards whose image fails to load, and only
+    // reveal the section if at least one card succeeds. Keeps the UI clean
+    // if some example assets are missing.
+    var cards = grid.querySelectorAll(".mosaic-example-card");
+    var revealed = false;
+    cards.forEach(function (card) {
+        var img = card.querySelector("img");
+        if (!img) return;
+        if (img.complete && img.naturalWidth > 0) {
+            if (!revealed) { wrap.hidden = false; revealed = true; }
+            return;
+        }
+        img.addEventListener("load", function () {
+            if (!revealed) { wrap.hidden = false; revealed = true; }
+        });
+        img.addEventListener("error", function () {
+            card.style.display = "none";
+        });
+    });
+
+    function loadExample(card) {
+        if (card.classList.contains("is-loading")) return;
+        var key = card.getAttribute("data-example");
+        if (!key) return;
+        var url = "assets/examples/" + key + ".jpg";
+        card.classList.add("is-loading");
+
+        fetch(url)
+            .then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.blob();
+            })
+            .then(function (blob) {
+                var file = new File([blob], key + ".jpg", { type: blob.type || "image/jpeg" });
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                imageSelectorHidden.files = dt.files;
+                // Enable selector buttons that may still be disabled (mirrors
+                // the flow that runs after the algo finishes initializing).
+                imageSelectorHidden.disabled = false;
+                var btn = document.getElementById("input-image-selector");
+                if (btn) btn.disabled = false;
+                imageSelectorHidden.dispatchEvent(new Event("change", { bubbles: true }));
+            })
+            .catch(function (err) {
+                console.error("[BRICKONAS] Example image load failed:", err);
+                card.classList.remove("is-loading");
+            });
+    }
+
+    grid.addEventListener("click", function (e) {
+        var card = e.target.closest(".mosaic-example-card");
+        if (card) loadExample(card);
+    });
+})();
+
 const depthImageSelectorHidden = document.getElementById("input-depth-image-selector-hidden");
 depthImageSelectorHidden.addEventListener("change", handleInputDepthMapImage, false);
 document.getElementById("input-depth-image-selector").addEventListener("click", () => {

@@ -231,6 +231,86 @@
         color: var(--bk-medium-gray);
       }
 
+      /* === EXAMPLE IMAGES GRID === */
+      .mosaic-examples {
+        margin-top: 28px;
+      }
+      .mosaic-examples-divider {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 16px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--bk-medium-gray);
+      }
+      .mosaic-examples-divider::before,
+      .mosaic-examples-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: rgba(0, 0, 0, 0.08);
+      }
+      .mosaic-examples-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      .mosaic-example-card {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        padding: 0;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        background: var(--bk-light-gray);
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+      .mosaic-example-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.3s ease;
+      }
+      .mosaic-example-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--bk-green, #2E7D32);
+        box-shadow: 0 6px 16px rgba(46, 125, 50, 0.18);
+      }
+      .mosaic-example-card:hover img {
+        transform: scale(1.06);
+      }
+      .mosaic-example-card:focus-visible {
+        outline: 3px solid var(--bk-green, #2E7D32);
+        outline-offset: 2px;
+      }
+      .mosaic-example-card.is-loading {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .mosaic-example-card.is-loading::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 28px;
+        height: 28px;
+        border: 3px solid rgba(255, 255, 255, 0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: bk-spin 0.7s linear infinite;
+      }
+      @keyframes bk-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (max-width: 480px) {
+        .mosaic-examples-grid { gap: 8px; }
+      }
+
       /* === STEP LAYOUT (side-by-side grid) === */
       .step-container { display: none; }
       .step-container.active { display: block; }
@@ -1166,6 +1246,31 @@
               </button>
             </span>
             <div class="mosaic-upload-formats" data-i18n="supportedFormatsShort">Erlaubte Dateien: JPG, PNG, GIF, WEBP</div>
+
+            <!-- Example images grid (hidden until at least one example image loads successfully) -->
+            <div class="mosaic-examples" id="mosaic-examples" hidden>
+              <div class="mosaic-examples-divider"><span data-i18n="orTryExample">Oder probiere ein Beispielbild</span></div>
+              <div class="mosaic-examples-grid" id="mosaic-examples-grid">
+                <button type="button" class="mosaic-example-card" data-example="tiger" aria-label="Tiger">
+                  <img src="assets/examples/tiger.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+                <button type="button" class="mosaic-example-card" data-example="dog" aria-label="Hund">
+                  <img src="assets/examples/dog.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+                <button type="button" class="mosaic-example-card" data-example="orange" aria-label="Portrait mit Orange">
+                  <img src="assets/examples/orange.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+                <button type="button" class="mosaic-example-card" data-example="paint-face" aria-label="Bunte Farben">
+                  <img src="assets/examples/paint-face.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+                <button type="button" class="mosaic-example-card" data-example="flower" aria-label="Blume">
+                  <img src="assets/examples/flower.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+                <button type="button" class="mosaic-example-card" data-example="louvre" aria-label="Louvre">
+                  <img src="assets/examples/louvre.jpg" alt="" loading="lazy" decoding="async" />
+                </button>
+              </div>
+            </div>
 
             <span id="run-example-input-container" hidden>
               <span style="margin: 0 8px; font-weight: 600">Oder</span>
