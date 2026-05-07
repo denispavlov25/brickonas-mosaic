@@ -3,9 +3,17 @@
 // falls back to text rendering.
 const BRICKONAS_LOGO = (function () {
     const img = new Image();
-    img.src = "assets/brickonas-logo.png?v=2";
+    img.src = "assets/brickonas-logo-banner.jpeg?v=1";
     return img;
 })();
+
+// Preload Playfair Display so the "BrickPic" subtitle on the title page is drawn
+// in the right typeface even when canvas rendering happens before the browser
+// has lazy-loaded the webfont. Failure here is silent — the title page falls
+// back to Georgia.
+if (typeof document !== "undefined" && document.fonts && document.fonts.load) {
+    document.fonts.load("italic 700 64px 'Playfair Display'").catch(function () {});
+}
 
 function hexToRgb(hex) {
     const hexInt = parseInt(hex.replace("#", ""), 16);
@@ -1242,15 +1250,20 @@ function generateInstructionTitlePage(
         legendRowHeight * availableStudHexList.length +
         legendEffectiveScale * 0.6;
 
-    // Logo block. Sits as a flat banner above the colour legend (left column),
-    // matching the legend's width with a deliberately reduced height so the
-    // BRICKONAS wordmark stays prominent and the green field doesn't dominate.
-    // Width is finalised below once we know the legend box width.
+    // Logo block. Sits as a banner above the colour legend (left column),
+    // stretched to match the legend's full width. Height is derived from the
+    // banner asset's natural aspect ratio so the wordmark stays undistorted.
     const titleFontSize = scalingFactor * 2;
     const logoLoaded = BRICKONAS_LOGO.complete && BRICKONAS_LOGO.naturalWidth > 0;
-    let logoTargetHeight = Math.max(titleFontSize * 1.4, 60);
-    let logoTargetWidth = 0; // set after legend is drawn
+    const logoAspect = logoLoaded
+        ? BRICKONAS_LOGO.naturalWidth / BRICKONAS_LOGO.naturalHeight
+        : 2.46;
+    let logoTargetWidth = 0; // set once we know the legend box width
+    let logoTargetHeight = 0;
     const logoToLegendGap = scalingFactor * 0.5;
+    // Pre-estimate height for layout reservation (refined after legend draws).
+    const logoEstWidth = pictureWidth * 0.5; // legend draws ~half-width
+    const logoEstHeight = logoEstWidth / logoAspect;
 
     const metaFontSize = Math.max(scalingFactor / 2, 24);
     const metaLineGap = metaFontSize * 1.7;
@@ -1292,7 +1305,7 @@ function generateInstructionTitlePage(
     const rightBlockHeight = topGroupHeight + infoToPreviewGap + previewHeightInit;
 
     // Left column reserves space for the logo banner above the legend.
-    const leftColumnHeight = logoTargetHeight + logoToLegendGap + legendEstHeight;
+    const leftColumnHeight = logoEstHeight + logoToLegendGap + legendEstHeight;
 
     const outerPadding = scalingFactor * 1.5;
     const requiredHeight = Math.max(leftColumnHeight, rightBlockHeight) + outerPadding * 2;
@@ -1303,7 +1316,7 @@ function generateInstructionTitlePage(
 
     // ---- Left column: logo banner above legend, group vertically centered ----
     const leftColumnTop = (canvas.height - leftColumnHeight) / 2;
-    const legendTop = leftColumnTop + logoTargetHeight + logoToLegendGap;
+    const legendTop = leftColumnTop + logoEstHeight + logoToLegendGap;
     const legendBox = drawStudCountForContext(
         studMap,
         availableStudHexList,
@@ -1314,14 +1327,15 @@ function generateInstructionTitlePage(
         pixelType
     );
 
-    // Logo banner: same width as the legend box, fixed flat height (does NOT
-    // preserve aspect ratio — the asset is squarish, but we want a wide banner
-    // so the BRICKONAS wordmark reads larger relative to the green field).
+    // Logo banner: spans the legend's full width. Height derived from the
+    // banner's natural aspect ratio so the wordmark stays undistorted.
     logoTargetWidth = legendBox.width;
+    logoTargetHeight = logoTargetWidth / logoAspect;
     const logoX = legendBox.left;
-    const logoY = leftColumnTop;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(logoX, logoY, logoTargetWidth, logoTargetHeight);
+    // Anchor the banner to the bottom of its reserved slot so the gap to the
+    // legend stays consistent when the natural aspect ratio differs slightly
+    // from the estimate used during layout.
+    const logoY = legendBox.top - logoToLegendGap - logoTargetHeight;
     if (logoLoaded) {
         ctx.drawImage(BRICKONAS_LOGO, logoX, logoY, logoTargetWidth, logoTargetHeight);
     } else {
@@ -1330,7 +1344,7 @@ function generateInstructionTitlePage(
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = `bold ${logoTargetHeight * 0.5}px Arial`;
+        ctx.font = `bold ${logoTargetHeight * 0.45}px Arial`;
         ctx.fillText("BRICKONAS", logoX + logoTargetWidth / 2, logoY + logoTargetHeight / 2);
         ctx.textAlign = "start";
         ctx.textBaseline = "alphabetic";
@@ -1384,13 +1398,16 @@ function generateInstructionTitlePage(
     const finalRightBlockHeight = finalTopGroupHeight + infoToPreviewGap + previewHeight;
     const rightBlockTop = (canvas.height - finalRightBlockHeight) / 2;
 
-    // Group is centered horizontally within the right block
-    const topRowLeft = rightBlockLeft + (rightBlockWidth - topRowTotalWidth) / 2;
+    // Info block is left-aligned with the preview/mosaic so BrickPic, the
+    // meta card and the plate-grid card all start at the same x-coordinate
+    // as the left edge of the mosaic image below.
+    const previewLeftEdge = (rightBlockLeft + rightBlockRight) / 2 - previewWidth / 2;
+    const topRowLeft = previewLeftEdge;
     const topRowTop = rightBlockTop + subTitleHeight;
 
     // ---- "BrickPic" subtitle above the info row, left-aligned with the row ----
     ctx.fillStyle = subTitleColor;
-    ctx.font = `bold italic ${subTitleFontSize}px Georgia, "Times New Roman", serif`;
+    ctx.font = `italic 700 ${subTitleFontSize}px "Playfair Display", Georgia, "Times New Roman", serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     ctx.fillText("BrickPic", topRowLeft, rightBlockTop + subTitleFontSize * 1.05);
