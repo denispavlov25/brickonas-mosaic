@@ -2976,6 +2976,38 @@ document.getElementById("download-instructions-button").addEventListener("click"
     await generateInstructions();
 });
 
+// Admin-only PDF download: revealed when URL contains ?admin=<token>.
+// Lets Denis grab the build-instructions PDF without going through checkout
+// (e.g. for live demos at events). Token is intentionally a shared secret —
+// not a real auth system; the PDF itself is non-sensitive.
+(function initAdminDownload() {
+    var ADMIN_TOKEN = "jonas-michel-denis";
+    try {
+        var token = new URLSearchParams(window.location.search).get("admin");
+        if (token !== ADMIN_TOKEN) return;
+        var panel = document.getElementById("mosaic-admin-download");
+        var btn = document.getElementById("admin-download-pdf-button");
+        if (!panel || !btn) return;
+        panel.hidden = false;
+        btn.addEventListener("click", async function () {
+            var orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "Anleitung wird erstellt…";
+            try {
+                await generateInstructions();
+            } catch (err) {
+                console.error("Admin PDF download failed:", err);
+                alert("PDF-Erstellung fehlgeschlagen. Konsole für Details öffnen.");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
+        });
+    } catch (e) {
+        console.warn("Admin download init failed:", e);
+    }
+})();
+
 document.getElementById("download-depth-instructions-button").addEventListener("click", async () => {
     await generateDepthInstructions();
 });
