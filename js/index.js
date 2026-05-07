@@ -3856,36 +3856,36 @@ function goToStep(stepNumber) {
     // active palette (e.g. it's hidden via BK_HIDDEN_COLOR_NAMES), it is
     // silently dropped at click time.
     var BK_STYLE_PALETTES = {
-        dark: [
-            // Filmisch-dramatisch: Schwarz, Grautöne, dunkle Erdtöne, dunkles Rot.
-            // Bewusst KEIN Grün, kein Sandblau, kein Olive — die machen Hauttöne grünlich.
-            "#212121", // Black
-            "#330000", // Dark Brown
-            "#532115", // Brown
-            "#89351d", // Reddish Brown
-            "#6a0e15", // Dark Red
-            "#b30006", // Red — accent for warmth
-            "#6b5a5a", // Dark Gray
-            "#595d60", // Dark Bluish Gray
-            "#666660", // Pearl Dark Gray
-            "#8c6b6b", // Sand Red — desaturated rose-grey
-            "#9c9c9c", // Light Gray — for highlights so faces don't disappear
-        ],
-        soft: [
-            // Sanft-natürlich: warme Beiges/Nougats + Weiß + Grautöne.
-            // Bewusst KEIN Rosa/Blau/Lila — die machen Hauttöne maskenhaft.
-            "#ffffff", // White
-            "#e8e8e8", // Very Light Gray
-            "#feccb0", // Light Nougat
-            "#ffaf7d", // Nougat
-            "#e3a05b", // Medium Nougat
+        vintage: [
+            // Sepia-Polaroid: nur Cremes, Browns, Bordeaux, dunkles Schwarz.
+            // Sehr warme, niedriggesättigte Töne → wirkt nostalgisch, alt.
             "#dec69c", // Tan
             "#D9C594", // Medium Tan
             "#907450", // Dark Tan
-            "#e6c05d", // Very Light Orange
-            "#ffe383", // Light Yellow
-            "#9c9c9c", // Light Gray — for darker shadows
-            "#6b5a5a", // Dark Gray — accent for definition
+            "#e3a05b", // Medium Nougat
+            "#a16c42", // Medium Brown
+            "#89351d", // Reddish Brown
+            "#532115", // Brown
+            "#330000", // Dark Brown
+            "#6a0e15", // Dark Red
+            "#212121", // Black
+            "#feccb0", // Light Nougat — for highlights
+            "#e8e8e8", // Very Light Gray — paper-white feel
+        ],
+        pop: [
+            // Knallige Pop-Art: Komplementärfarben, hohe Sättigung,
+            // Schwarz/Weiß für Kontrast. Wie Warhol-Siebdruck.
+            "#ffffff", // White
+            "#212121", // Black
+            "#b30006", // Red
+            "#ff7e14", // Orange
+            "#fffc00", // Neon Yellow
+            "#10cb31", // Bright Green
+            "#0057a6", // Blue
+            "#42c0fb", // Medium Azure
+            "#a5499c", // Purple
+            "#ffbbff", // Bright Pink
+            "#f785b1", // Medium Dark Pink
         ],
         warm: [
             "#ffffff", // White (highlights)
@@ -3920,8 +3920,8 @@ function goToStep(stepNumber) {
 
     var BK_STYLE_PRESETS = [
         { id: "original", labelKey: "styleOriginal", labelDe: "Original" },
-        { id: "dark",     labelKey: "styleDark",     labelDe: "Dunkel"   },
-        { id: "soft",     labelKey: "styleSoft",     labelDe: "Hell"     },
+        { id: "vintage",  labelKey: "styleVintage",  labelDe: "Vintage"  },
+        { id: "pop",      labelKey: "stylePop",      labelDe: "Pop"      },
         { id: "warm",     labelKey: "styleWarm",     labelDe: "Warm"     },
         { id: "mono",     labelKey: "styleMono",     labelDe: "S/W"      },
     ];

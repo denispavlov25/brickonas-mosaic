@@ -232,8 +232,8 @@ const translations = {
         // Style picker (Step 2)
         stylePickerLabel: "Wähle einen Stil",
         styleOriginal: "Original",
-        styleDark: "Dunkel",
-        styleSoft: "Hell",
+        styleVintage: "Vintage",
+        stylePop: "Pop",
         styleWarm: "Warm",
         styleMono: "S/W",
 
