@@ -3857,38 +3857,35 @@ function goToStep(stepNumber) {
     // silently dropped at click time.
     var BK_STYLE_PALETTES = {
         dark: [
+            // Filmisch-dramatisch: Schwarz, Grautöne, dunkle Erdtöne, dunkles Rot.
+            // Bewusst KEIN Grün, kein Sandblau, kein Olive — die machen Hauttöne grünlich.
             "#212121", // Black
             "#330000", // Dark Brown
             "#532115", // Brown
-            "#6a0e15", // Dark Red
-            "#143044", // Dark Blue
-            "#2e5543", // Dark Green
-            "#595d60", // Dark Bluish Gray
-            "#6b5a5a", // Dark Gray
-            "#666660", // Pearl Dark Gray
             "#89351d", // Reddish Brown
-            "#7c9051", // Olive Green
-            "#5a7184", // Sand Blue
-            "#8c6b6b", // Sand Red
-            "#b30006", // Red — accent
+            "#6a0e15", // Dark Red
+            "#b30006", // Red — accent for warmth
+            "#6b5a5a", // Dark Gray
+            "#595d60", // Dark Bluish Gray
+            "#666660", // Pearl Dark Gray
+            "#8c6b6b", // Sand Red — desaturated rose-grey
+            "#9c9c9c", // Light Gray — for highlights so faces don't disappear
         ],
         soft: [
+            // Sanft-natürlich: warme Beiges/Nougats + Weiß + Grautöne.
+            // Bewusst KEIN Rosa/Blau/Lila — die machen Hauttöne maskenhaft.
             "#ffffff", // White
             "#e8e8e8", // Very Light Gray
-            "#e4e8e8", // Very Light Bluish Gray
             "#feccb0", // Light Nougat
             "#ffaf7d", // Nougat
-            "#ffdedc", // Light Salmon
-            "#ffe1ff", // Light Pink
-            "#ffc0cb", // Pink
-            "#b4d2e3", // Light Blue
-            "#9fc3e9", // Bright Light Blue
-            "#a5dbb5", // Light Green
-            "#ffe383", // Light Yellow
-            "#f3e055", // Bright Light Yellow
+            "#e3a05b", // Medium Nougat
             "#dec69c", // Tan
+            "#D9C594", // Medium Tan
+            "#907450", // Dark Tan
             "#e6c05d", // Very Light Orange
-            "#c9cae2", // Light Violet
+            "#ffe383", // Light Yellow
+            "#9c9c9c", // Light Gray — for darker shadows
+            "#6b5a5a", // Dark Gray — accent for definition
         ],
         warm: [
             "#ffffff", // White (highlights)
