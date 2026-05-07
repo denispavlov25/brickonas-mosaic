@@ -3332,6 +3332,7 @@ function showVisualStep(vstep) {
     }
 
     currentVisualStep = vstep;
+    document.dispatchEvent(new CustomEvent('bk-visual-step-change', { detail: { step: vstep } }));
 
     // When returning to step 1, Cropper.js must be fully reinitialized.
     // The hidden attribute (display:none) makes Cropper lose all internal
@@ -3851,13 +3852,13 @@ function goToStep(stepNumber) {
         { id: "original", labelKey: "styleOriginal", labelDe: "Original",
           hue: 0, saturation: 0, value: 0, brightness: 0, contrast: 0 },
         { id: "dark", labelKey: "styleDark", labelDe: "Dunkel",
-          hue: 0, saturation: 10, value: -15, brightness: -15, contrast: 30 },
+          hue: 0, saturation: 20, value: -25, brightness: -30, contrast: 50 },
         { id: "soft", labelKey: "styleSoft", labelDe: "Hell",
-          hue: 0, saturation: -15, value: 15, brightness: 20, contrast: -10 },
+          hue: 0, saturation: -25, value: 25, brightness: 35, contrast: -20 },
         { id: "warm", labelKey: "styleWarm", labelDe: "Warm",
-          hue: 5, saturation: 15, value: 0, brightness: 5, contrast: 10 },
+          hue: 10, saturation: 30, value: 5, brightness: 15, contrast: 15 },
         { id: "mono", labelKey: "styleMono", labelDe: "S/W",
-          hue: 0, saturation: -100, value: 0, brightness: 0, contrast: 20 },
+          hue: 0, saturation: -100, value: 0, brightness: 0, contrast: 30 },
     ];
 
     var picker = document.getElementById("bk-style-picker");
@@ -3886,21 +3887,64 @@ function goToStep(stepNumber) {
         if (coText) coText.textContent = preset.contrast;
     }
 
-    function styleTo2dFilter(p) {
-        // Translate slider values to a CSS filter string so we can render
-        // cheap previews without running the mosaic pipeline. Sliders are
-        // additive (range -100..+100 mostly), CSS filter() values are
-        // multiplicative (1 = unchanged), so we map ranges by hand.
-        var saturate = 1 + (p.saturation / 100);
-        if (p.saturation <= -100) saturate = 0;
-        var br = 1 + (p.brightness / 200);   // -128..128 → roughly 0.36..1.64
-        var co = 1 + (p.contrast / 200);
-        var lighten = 1 + (p.value / 200);
-        var hue = p.hue;
-        return "saturate(" + saturate.toFixed(3) + ") " +
-               "brightness(" + (br * lighten).toFixed(3) + ") " +
-               "contrast(" + co.toFixed(3) + ") " +
-               "hue-rotate(" + hue + "deg)";
+    // Apply a style preset to a flat RGBA Uint8ClampedArray in-place. Mirrors
+    // the order of operations the main pipeline uses in runStep2(): HSV first
+    // (hue / saturation / value), then brightness, then contrast.
+    function applyPresetToImageData(data, preset) {
+        var hueShift = preset.hue || 0;        // -180..180 (degrees)
+        var satMul = 1 + ((preset.saturation || 0) / 100);     // 0..2
+        if (preset.saturation <= -100) satMul = 0;
+        var valMul = 1 + ((preset.value || 0) / 100);          // 0..2
+        var brAdd = preset.brightness || 0;     // -128..128 (additive)
+        var coDelta = preset.contrast || 0;     // -128..128
+        var coFactor = (259 * (coDelta + 255)) / (255 * (259 - coDelta));
+
+        for (var i = 0; i < data.length; i += 4) {
+            var r = data[i], g = data[i + 1], b = data[i + 2];
+            // RGB → HSV
+            var rN = r / 255, gN = g / 255, bN = b / 255;
+            var maxC = Math.max(rN, gN, bN);
+            var minC = Math.min(rN, gN, bN);
+            var d = maxC - minC;
+            var h = 0;
+            if (d !== 0) {
+                if (maxC === rN) h = ((gN - bN) / d) % 6;
+                else if (maxC === gN) h = ((bN - rN) / d) + 2;
+                else h = ((rN - gN) / d) + 4;
+                h *= 60;
+                if (h < 0) h += 360;
+            }
+            var v = maxC;
+            var s = maxC === 0 ? 0 : d / maxC;
+            // Apply HSV adjustments
+            h = (h + hueShift) % 360; if (h < 0) h += 360;
+            s = Math.max(0, Math.min(1, s * satMul));
+            v = Math.max(0, Math.min(1, v * valMul));
+            // HSV → RGB
+            var c = v * s;
+            var x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            var m = v - c;
+            var r2, g2, b2;
+            if (h < 60)      { r2 = c; g2 = x; b2 = 0; }
+            else if (h < 120){ r2 = x; g2 = c; b2 = 0; }
+            else if (h < 180){ r2 = 0; g2 = c; b2 = x; }
+            else if (h < 240){ r2 = 0; g2 = x; b2 = c; }
+            else if (h < 300){ r2 = x; g2 = 0; b2 = c; }
+            else             { r2 = c; g2 = 0; b2 = x; }
+            r = (r2 + m) * 255;
+            g = (g2 + m) * 255;
+            b = (b2 + m) * 255;
+            // Brightness (additive)
+            r += brAdd; g += brAdd; b += brAdd;
+            // Contrast
+            r = coFactor * (r - 128) + 128;
+            g = coFactor * (g - 128) + 128;
+            b = coFactor * (b - 128) + 128;
+            // Clamp
+            data[i]     = Math.max(0, Math.min(255, r));
+            data[i + 1] = Math.max(0, Math.min(255, g));
+            data[i + 2] = Math.max(0, Math.min(255, b));
+        }
     }
 
     function renderTilePreviews() {
@@ -3915,6 +3959,9 @@ function goToStep(stepNumber) {
             });
         } catch (e) { return; }
         if (!src) return;
+        // Read source pixels once.
+        var srcCtx = src.getContext("2d");
+        var srcImageData = srcCtx.getImageData(0, 0, 96, 96);
         var tiles = grid.querySelectorAll(".bk-style-tile");
         tiles.forEach(function(tile) {
             var preset = BK_STYLE_PRESETS.find(function(p) { return p.id === tile.dataset.style; });
@@ -3923,9 +3970,11 @@ function goToStep(stepNumber) {
             if (!canvas) return;
             canvas.width = 96; canvas.height = 96;
             var ctx = canvas.getContext("2d");
-            ctx.filter = styleTo2dFilter(preset);
-            ctx.drawImage(src, 0, 0, 96, 96);
-            ctx.filter = "none";
+            // Make a fresh copy of the source pixels for each tile.
+            var imgData = ctx.createImageData(96, 96);
+            imgData.data.set(srcImageData.data);
+            applyPresetToImageData(imgData.data, preset);
+            ctx.putImageData(imgData, 0, 0);
         });
     }
 
@@ -3958,48 +4007,21 @@ function goToStep(stepNumber) {
         tilesBuilt = true;
     }
 
-    // Show the picker only once Step 2 is reachable (i.e. a mosaic was
-    // generated). Listen for visual-step changes via the 'create-mosaic-btn'
-    // click and the existing showVisualStep flow.
-    function refreshPicker() {
-        if (typeof currentVisualStep !== "undefined" && currentVisualStep === 2) {
+    // showVisualStep dispatches a 'bk-visual-step-change' event whenever the
+    // user transitions between steps. Use that as the single source of truth.
+    document.addEventListener("bk-visual-step-change", function(e) {
+        var step = e && e.detail && e.detail.step;
+        if (step === 2) {
             buildTilesOnce();
             picker.hidden = false;
-            renderTilePreviews();
+            // Defer a frame so the canvas-area layout has settled and the
+            // cropper has produced a fresh cropped canvas.
+            requestAnimationFrame(function() {
+                requestAnimationFrame(renderTilePreviews);
+            });
         } else {
             picker.hidden = true;
         }
-    }
-
-    // Hook into the visual step transitions. We can't override showVisualStep
-    // directly (defined in another scope), but we know the create-mosaic-btn
-    // and the back-to-refine paths land us on step 2.
-    document.addEventListener("DOMContentLoaded", function() {
-        var createBtn = document.getElementById("create-mosaic-btn");
-        if (createBtn) createBtn.addEventListener("click", function() {
-            // runStepProcessing(3) finishes asynchronously; poll briefly.
-            var tries = 0;
-            var iv = setInterval(function() {
-                tries++;
-                if (typeof currentVisualStep !== "undefined" && currentVisualStep === 2) {
-                    refreshPicker();
-                    clearInterval(iv);
-                } else if (tries > 40) {
-                    clearInterval(iv);
-                }
-            }, 100);
-        });
-        var backRefine = document.getElementById("back-to-refine-btn");
-        if (backRefine) backRefine.addEventListener("click", function() {
-            setTimeout(refreshPicker, 50);
-        });
-        // Also re-render previews whenever the user navigates back to step 1
-        // and re-crops, then comes forward again — handled by create-mosaic-btn
-        // path above. Hide picker on step 1/3.
-        var backToStep1 = document.getElementById("back-to-step1-btn");
-        if (backToStep1) backToStep1.addEventListener("click", function() {
-            setTimeout(refreshPicker, 50);
-        });
     });
 })();
 
