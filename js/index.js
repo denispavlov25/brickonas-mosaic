@@ -3948,48 +3948,71 @@ function goToStep(stepNumber) {
     }
 
     function getPreviewSourceCanvas() {
-        // Prefer the small step-2-canvas (already-pixelated mosaic image,
-        // guaranteed populated when we're on visual step 2). Fall back to
-        // the cropper canvas if step-2-canvas isn't ready yet.
+        // Use step-2-canvas (the small pre-color-match pixelated image) —
+        // guaranteed populated when visual step 2 is shown.
         var src = document.getElementById("step-2-canvas");
         if (src && src.width > 0 && src.height > 0) return src;
-        if (typeof inputImageCropper !== "undefined" && inputImageCropper) {
-            try {
-                return inputImageCropper.getCroppedCanvas({
-                    width: 128, height: 128, imageSmoothingEnabled: true,
-                });
-            } catch (e) {}
-        }
         return null;
     }
 
     function renderTilePreviews() {
         var src = getPreviewSourceCanvas();
         if (!src || !src.width || !src.height) {
-            // Try again next frame — step-2-canvas might still be 0×0.
             requestAnimationFrame(renderTilePreviews);
             return;
         }
-        var TILE = 96;
-        // Read source pixels once into a temporary canvas at TILE×TILE.
+        // Render each tile as a real mini-mosaic: small grid (32×32 max),
+        // pre-filter pixels with the style preset, run the same color match
+        // the main pipeline runs, then draw studs (dots).
+        var GRID = Math.min(32, src.width);
+        var DOT_SIZE = 4; // px per stud → 32×32 grid = 128px tile (matches CSS)
+
+        // Pull source pixels once at GRID×GRID via a tmp canvas.
         var tmp = document.createElement("canvas");
-        tmp.width = TILE; tmp.height = TILE;
+        tmp.width = GRID; tmp.height = GRID;
         var tmpCtx = tmp.getContext("2d");
         tmpCtx.imageSmoothingEnabled = true;
-        tmpCtx.drawImage(src, 0, 0, TILE, TILE);
-        var srcImageData = tmpCtx.getImageData(0, 0, TILE, TILE);
+        tmpCtx.drawImage(src, 0, 0, GRID, GRID);
+        var basePixels = tmpCtx.getImageData(0, 0, GRID, GRID).data;
+
+        // Resolve the active stud map + distance function from the global
+        // scope. They're defined later in this file, so we look them up
+        // lazily.
+        var studMap = (typeof selectedStudMap !== "undefined") ? selectedStudMap : null;
+        var distFn = (typeof colorDistanceFunction !== "undefined") ? colorDistanceFunction : null;
+        var canMatch = studMap && distFn && typeof alignPixelsToStudMap === "function";
+
         var tiles = grid.querySelectorAll(".bk-style-tile");
         tiles.forEach(function(tile) {
             var preset = BK_STYLE_PRESETS.find(function(p) { return p.id === tile.dataset.style; });
             if (!preset) return;
             var canvas = tile.querySelector("canvas.bk-style-tile-preview");
             if (!canvas) return;
-            canvas.width = TILE; canvas.height = TILE;
+
+            // 1) Make a fresh copy of the base pixels for this tile.
+            var pix = new Uint8ClampedArray(basePixels);
+            // 2) Apply the style pre-filter.
+            applyPresetToImageData(pix, preset);
+            // 3) Align to the active LEGO palette (so the preview shows
+            //    actual brick colours, not raw filtered pixels).
+            var aligned = canMatch ? alignPixelsToStudMap(pix, studMap, distFn) : pix;
+
+            // 4) Render as studs: tile = GRID × GRID dots of DOT_SIZE px.
+            canvas.width = GRID * DOT_SIZE;
+            canvas.height = GRID * DOT_SIZE;
             var ctx = canvas.getContext("2d");
-            var imgData = ctx.createImageData(TILE, TILE);
-            imgData.data.set(srcImageData.data);
-            applyPresetToImageData(imgData.data, preset);
-            ctx.putImageData(imgData, 0, 0);
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            var radius = DOT_SIZE / 2;
+            for (var i = 0; i < GRID * GRID; i++) {
+                var r = aligned[i * 4], g = aligned[i * 4 + 1], b = aligned[i * 4 + 2];
+                ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+                var x = (i % GRID) * DOT_SIZE + radius;
+                var y = Math.floor(i / GRID) * DOT_SIZE + radius;
+                ctx.beginPath();
+                ctx.arc(x, y, radius - 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
         });
     }
 
@@ -4010,28 +4033,39 @@ function goToStep(stepNumber) {
             tile.appendChild(label);
             tile.addEventListener("click", function() {
                 if (selectedStyleId === preset.id) return;
-                if (grid.dataset.busy === "1") return; // ignore clicks during processing
+                if (grid.dataset.busy === "1") return;
                 selectedStyleId = preset.id;
                 grid.querySelectorAll(".bk-style-tile").forEach(function(t) {
                     t.classList.toggle("active", t.dataset.style === preset.id);
                 });
                 applyStyle(preset);
-                // Invalidate downstream steps so runStepProcessing actually
-                // re-runs them with the new slider values.
-                if (typeof invalidateStepsFrom === "function") invalidateStepsFrom(2);
+                // The main pipeline reads slider values via runStep2(). Skip
+                // runStepProcessing — it expects stepProcessed[N] to flip
+                // and was racing with the runStep2 auto-chain to step 3,
+                // which left the busy flag stuck. Calling runStep2()
+                // directly is the same path the HSV sliders use and works
+                // synchronously up to a setTimeout(...,1) that auto-chains
+                // to step 3 because we're on visual step 2.
                 grid.dataset.busy = "1";
                 var safetyTimeout = setTimeout(function() {
                     grid.dataset.busy = "";
-                }, 8000);
-                if (typeof runStepProcessing === "function") {
-                    runStepProcessing(3, function() {
+                    console.warn("[bk-style] safety timeout fired");
+                }, 6000);
+                // Watch stepProcessed[3] flipping to true — that's the signal
+                // the main mosaic image has been re-rendered.
+                var pollStart = Date.now();
+                var poll = setInterval(function() {
+                    if (typeof stepProcessed !== "undefined" && stepProcessed[3]) {
+                        clearInterval(poll);
                         clearTimeout(safetyTimeout);
                         grid.dataset.busy = "";
-                    });
-                } else {
-                    clearTimeout(safetyTimeout);
-                    grid.dataset.busy = "";
-                }
+                    } else if (Date.now() - pollStart > 6000) {
+                        clearInterval(poll);
+                    }
+                }, 80);
+                // Invalidate downstream so runStep2 → runStep3 chain reruns.
+                if (typeof invalidateStepsFrom === "function") invalidateStepsFrom(2);
+                if (typeof runStep2 === "function") runStep2();
             });
             grid.appendChild(tile);
         });
