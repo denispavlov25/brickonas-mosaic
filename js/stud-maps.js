@@ -591,3 +591,32 @@ STUD_MAPS["pick_a_brick"] = {
     sortedStuds: availablePickABrickStudHexes,
     studMap: pickABricStudkHexToCount,
 };
+
+// Strip the hex codes of hidden colors (see BK_HIDDEN_COLOR_NAMES in
+// bricklink-colors.js) from every preset stud map. The pre-built sets
+// like "Art Project (21226)" or "Warhol" hard-code hex codes that bypass
+// the ALL_BRICKLINK_SOLID_COLORS filter, so we sweep them here too. This
+// keeps hidden colors out of the configurator palette, the build
+// instructions and the parts list regardless of which preset the user
+// picks. To unhide a colour: remove it from BK_HIDDEN_COLOR_NAMES *and*
+// from BK_HIDDEN_COLOR_HEXES below.
+const BK_HIDDEN_COLOR_HEXES = [
+    "#b3694e", // Fabuland Brown
+    "#ccffff", // Light Aqua
+    "#5f2683", // Dark Purple
+    "#61afff", // Medium Blue
+    "#008a80", // Dark Turquoise
+    "#31b5ca", // Light Turquoise
+    "#b5d3d6", // Aqua
+];
+Object.keys(STUD_MAPS).forEach((key) => {
+    const map = STUD_MAPS[key];
+    if (Array.isArray(map.sortedStuds)) {
+        map.sortedStuds = map.sortedStuds.filter((hex) => !BK_HIDDEN_COLOR_HEXES.includes(hex));
+    }
+    if (map.studMap && typeof map.studMap === "object") {
+        BK_HIDDEN_COLOR_HEXES.forEach((hex) => {
+            if (hex in map.studMap) delete map.studMap[hex];
+        });
+    }
+});
