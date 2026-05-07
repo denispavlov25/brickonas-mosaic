@@ -445,6 +445,23 @@ let ALL_BRICKLINK_SOLID_COLORS = [
     },
 ];
 
+// Hidden colors — excluded from the configurator algorithm, the colour
+// palette UI, the build instructions and the parts list. To unhide a
+// colour, remove its name from this list. Names must match the `name`
+// field above exactly.
+const BK_HIDDEN_COLOR_NAMES = [
+    "Fabuland Brown",
+    "Light Aqua",
+    "Dark Purple",
+    "Medium Blue",
+    "Dark Turquoise",
+    "Light Turquoise",
+    "Aqua",
+];
+ALL_BRICKLINK_SOLID_COLORS = ALL_BRICKLINK_SOLID_COLORS.filter(
+    (c) => !BK_HIDDEN_COLOR_NAMES.includes(c.name)
+);
+
 const HEX_TO_COLOR_NAME = {};
 ALL_BRICKLINK_SOLID_COLORS.forEach((color) => {
     HEX_TO_COLOR_NAME[color.hex] = color.name;
