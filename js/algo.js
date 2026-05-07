@@ -1123,7 +1123,7 @@ function drawStudCountForContext(
     }
 
     // Header background bar
-    ctx.fillStyle = "#2E7D32";
+    ctx.fillStyle = "#1B5E20";
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {
         // Top corners rounded, bottom flush with row area
@@ -1220,10 +1220,14 @@ function generateInstructionTitlePage(
     const platesPerRow = width / plateWidth;
     const platesPerCol = numPlates / platesPerRow;
     
-    // Calculate legend dimensions
-    const legendSquareSide = scalingFactor;
+    // Plate grid sizing: each cell is at least 70px so it stays readable on
+    // high-resolution mosaics (small scalingFactor would otherwise make the
+    // grid tiny). Cap individual cells so a 4x4 grid doesn't dominate the page.
+    const legendSquareSide = Math.max(Math.min(scalingFactor * 1.5, 110), 70);
     const legendGridWidth = legendSquareSide * platesPerRow;
     const legendGridHeight = legendSquareSide * platesPerCol;
+    const gridHeaderFontSize = Math.max(scalingFactor / 2.2, 22);
+    const gridHeaderHeight = gridHeaderFontSize * 1.5;
     
     // Estimate legend height up-front so the canvas reserves enough room for it.
     // This mirrors the maths in drawStudCountForContext (rowHeight + paddings).
@@ -1238,14 +1242,16 @@ function generateInstructionTitlePage(
         legendRowHeight * availableStudHexList.length +
         legendEffectiveScale * 0.6;
 
-    // Logo block (replaces text title). Height ~= titleFontSize * 1.6 to leave breathing
-    // room above/below; aspect ratio is preserved from the loaded asset (~5:2 by default).
+    // Logo block (replaces text title). Sized large for prominence — height is ~3.5x
+    // the old text title; width is capped so the logo never exceeds half the canvas
+    // width on very wide layouts. Aspect ratio is preserved from the loaded asset.
     const titleFontSize = scalingFactor * 2;
-    const logoTargetHeight = titleFontSize * 1.6;
     const logoLoaded = BRICKONAS_LOGO.complete && BRICKONAS_LOGO.naturalWidth > 0;
     const logoAspect = logoLoaded ? BRICKONAS_LOGO.naturalWidth / BRICKONAS_LOGO.naturalHeight : 2.5;
-    const logoTargetWidth = logoTargetHeight * logoAspect;
-    const titleHeight = logoTargetHeight + scalingFactor * 0.5;
+    let logoTargetHeight = Math.max(titleFontSize * 3.5, 110);
+    let logoTargetWidth = logoTargetHeight * logoAspect;
+    // Capped later (after rightBlockWidth is known) to max 70% of right-block width.
+    const titleHeight = logoTargetHeight + scalingFactor * 0.6;
 
     const metaFontSize = Math.max(scalingFactor / 2, 22);
     const metaLineGap = metaFontSize * 1.7;
@@ -1271,7 +1277,7 @@ function generateInstructionTitlePage(
     }
 
     const gridDrawn = numPlates > 1;
-    const gridHeight = gridDrawn ? legendGridHeight : 0;
+    const gridHeight = gridDrawn ? gridHeaderHeight + legendGridHeight : 0;
     const rightBlockHeight =
         titleHeight +
         titleToMetaGap +
@@ -1316,8 +1322,18 @@ function generateInstructionTitlePage(
         previewHeight = previewMaxHeight;
         previewWidth = previewHeight * srcAspect;
     }
+
+    // Cap the logo to 70% of the right-block width (proportional scale).
+    const logoMaxWidth = rightBlockWidth * 0.7;
+    if (logoTargetWidth > logoMaxWidth) {
+        const k = logoMaxWidth / logoTargetWidth;
+        logoTargetWidth = logoMaxWidth;
+        logoTargetHeight = logoTargetHeight * k;
+    }
+    const finalTitleHeight = logoTargetHeight + scalingFactor * 0.6;
+
     const finalRightBlockHeight =
-        titleHeight +
+        finalTitleHeight +
         titleToMetaGap +
         metaBlockHeight +
         (gridDrawn ? metaToGridGap + gridHeight : 0) +
@@ -1338,11 +1354,11 @@ function generateInstructionTitlePage(
         ctx.fillStyle = "#1B5E20";
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";
-        ctx.font = `bold ${titleFontSize}px Arial`;
-        ctx.fillText("BRICKONAS", rightBlockCenterX, cursorY + titleFontSize);
+        ctx.font = `bold ${titleFontSize * 1.6}px Arial`;
+        ctx.fillText("BRICKONAS", rightBlockCenterX, cursorY + titleFontSize * 1.6);
         ctx.textAlign = "start";
     }
-    cursorY += titleHeight + titleToMetaGap;
+    cursorY += finalTitleHeight + titleToMetaGap;
 
     // Metadata card: rounded light-grey background with two-column layout
     // (label right-aligned, value left-aligned, separated by a thin vertical line).
@@ -1416,32 +1432,61 @@ function generateInstructionTitlePage(
     ctx.textAlign = "start";
     cursorY += metaBlockHeight;
 
-    // Plate grid (only when >1 plate) — centered on the right-block axis
+    // Plate grid (only when >1 plate) — centered on the right-block axis.
+    // Styled as a card: header label, light cells with rounded corners,
+    // bold centered numbers, dezenter dark grey border.
     if (gridDrawn) {
         cursorY += metaToGridGap;
+
+        // Header label
+        ctx.fillStyle = "#444444";
+        ctx.font = `bold ${gridHeaderFontSize}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText("Plattenanordnung", rightBlockCenterX, cursorY + gridHeaderFontSize);
+        cursorY += gridHeaderHeight;
+
         const gridLeftX = rightBlockCenterX - (legendGridWidth / 2);
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = "#000000";
-        ctx.fillStyle = "#000000";
-        ctx.font = `${legendSquareSide / 2}px Arial`;
+        const cellRadius = Math.min(legendSquareSide * 0.12, 8);
+        const cellPad = 2;
+
         for (var i = 0; i < numPlates; i++) {
             const horIndex = ((i * plateWidth) % width) / plateWidth;
             const vertIndex = Math.floor((i * plateWidth) / width);
+            const cellX = gridLeftX + horIndex * legendSquareSide + cellPad;
+            const cellY = cursorY + vertIndex * legendSquareSide + cellPad;
+            const cellW = legendSquareSide - cellPad * 2;
+            const cellH = legendSquareSide - cellPad * 2;
+
+            // Light fill
+            ctx.fillStyle = "#f7f7f7";
             ctx.beginPath();
-            ctx.rect(
-                gridLeftX + horIndex * legendSquareSide,
-                cursorY + vertIndex * legendSquareSide,
-                legendSquareSide,
-                legendSquareSide
-            );
+            if (typeof ctx.roundRect === "function") {
+                ctx.roundRect(cellX, cellY, cellW, cellH, cellRadius);
+            } else {
+                ctx.rect(cellX, cellY, cellW, cellH);
+            }
+            ctx.fill();
+
+            // Border
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "#888888";
+            ctx.stroke();
+
+            // Centered bold number
+            ctx.fillStyle = "#1a1a1a";
+            ctx.font = `bold ${legendSquareSide * 0.45}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
             ctx.fillText(
                 i + 1,
-                gridLeftX + (horIndex + 0.18) * legendSquareSide,
-                cursorY + (vertIndex + 0.65) * legendSquareSide
+                cellX + cellW / 2,
+                cellY + cellH / 2 + 1
             );
-            ctx.stroke();
         }
-        cursorY += gridHeight;
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+        cursorY += legendGridHeight;
     }
 
     // Preview image, centered horizontally on the right-block axis
