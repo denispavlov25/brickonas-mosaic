@@ -3,7 +3,7 @@
 // falls back to text rendering.
 const BRICKONAS_LOGO = (function () {
     const img = new Image();
-    img.src = "assets/brickonas-logo.png";
+    img.src = "assets/brickonas-logo.png?v=2";
     return img;
 })();
 
