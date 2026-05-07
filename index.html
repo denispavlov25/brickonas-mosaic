@@ -436,48 +436,65 @@
       .bk-designservice {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 14px 18px;
+        gap: 20px;
+        padding: 16px 18px 16px 20px;
         margin-top: 18px;
         background: var(--bk-green-pale);
-        border: 1px solid var(--bk-green-accent);
+        border-left: 4px solid var(--bk-green-primary);
         border-radius: var(--bk-radius-md);
       }
       .bk-designservice .bk-ds-text {
         flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
       }
       .bk-designservice .bk-ds-text strong {
         font-family: var(--bk-font-heading, Fredoka, sans-serif);
-        font-size: 1rem;
+        font-size: 1.05rem;
+        font-weight: 600;
         color: var(--bk-green-dark);
+        letter-spacing: 0.2px;
       }
       .bk-designservice .bk-ds-text span {
-        font-size: 0.88rem;
-        color: var(--bk-charcoal);
-        line-height: 1.4;
+        font-size: 0.86rem;
+        color: var(--bk-dark-gray);
+        line-height: 1.45;
       }
       .bk-designservice .bk-ds-btn {
         flex-shrink: 0;
-        padding: 10px 18px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
         background: var(--bk-green-primary);
         color: var(--bk-white);
         border: none;
-        border-radius: var(--bk-radius-sm);
+        border-radius: 999px;
         font-family: var(--bk-font-heading, Fredoka, sans-serif);
-        font-size: 0.92rem;
+        font-size: 0.88rem;
         font-weight: 600;
         cursor: pointer;
-        transition: background 0.2s;
+        box-shadow: 0 2px 6px rgba(46, 125, 50, 0.25);
+        transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      }
+      .bk-designservice .bk-ds-btn::after {
+        content: "→";
+        font-size: 1rem;
+        line-height: 1;
+        transition: transform 0.2s;
       }
       .bk-designservice .bk-ds-btn:hover {
         background: var(--bk-green-dark);
+        box-shadow: 0 4px 10px rgba(46, 125, 50, 0.35);
+        transform: translateY(-1px);
+      }
+      .bk-designservice .bk-ds-btn:hover::after {
+        transform: translateX(3px);
       }
       @media (max-width: 540px) {
         .bk-designservice { flex-direction: column; align-items: stretch; gap: 12px; }
-        .bk-designservice .bk-ds-btn { width: 100%; }
+        .bk-designservice .bk-ds-btn { width: 100%; justify-content: center; }
       }
 
       /* === NAVIGATION BUTTONS === */
