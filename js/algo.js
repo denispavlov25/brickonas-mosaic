@@ -1046,7 +1046,7 @@ function drawStudCountForContext(
     // Use a minimum font size so the legend stays readable at high resolutions
     // (e.g. 288x288 mosaics where scalingFactor is small). The legend's geometry
     // is then driven by `effectiveScale`, decoupling it from the picture grid.
-    const MIN_LEGEND_FONT = 22;
+    const MIN_LEGEND_FONT = 26;
     const countFontSize = Math.max(scalingFactor / 2, MIN_LEGEND_FONT);
     const nameFontSize = Math.max(scalingFactor / 2.5, MIN_LEGEND_FONT * 0.85);
     const effectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT * 2);
@@ -1220,18 +1220,18 @@ function generateInstructionTitlePage(
     const platesPerRow = width / plateWidth;
     const platesPerCol = numPlates / platesPerRow;
     
-    // Plate grid sizing: each cell is at least 70px so it stays readable on
-    // high-resolution mosaics (small scalingFactor would otherwise make the
-    // grid tiny). Cap individual cells so a 4x4 grid doesn't dominate the page.
-    const legendSquareSide = Math.max(Math.min(scalingFactor * 1.5, 110), 70);
+    // Plate grid sizing: each cell is at least 90px so it stays readable on
+    // high-resolution mosaics. Cap individual cells so a 4x4 grid doesn't
+    // dominate the page.
+    const legendSquareSide = Math.max(Math.min(scalingFactor * 1.7, 130), 90);
     const legendGridWidth = legendSquareSide * platesPerRow;
     const legendGridHeight = legendSquareSide * platesPerCol;
-    const gridHeaderFontSize = Math.max(scalingFactor / 2.2, 22);
-    const gridHeaderHeight = gridHeaderFontSize * 1.5;
-    
+    const gridHeaderFontSize = Math.max(scalingFactor / 2, 26);
+    const gridHeaderHeight = gridHeaderFontSize * 1.6;
+
     // Estimate legend height up-front so the canvas reserves enough room for it.
     // This mirrors the maths in drawStudCountForContext (rowHeight + paddings).
-    const MIN_LEGEND_FONT_LOCAL = 22;
+    const MIN_LEGEND_FONT_LOCAL = 26;
     const legendCountFontLocal = Math.max(scalingFactor / 2, MIN_LEGEND_FONT_LOCAL);
     const legendEffectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT_LOCAL * 2);
     const legendRowHeight = legendEffectiveScale * 1.3;
@@ -1242,34 +1242,29 @@ function generateInstructionTitlePage(
         legendRowHeight * availableStudHexList.length +
         legendEffectiveScale * 0.6;
 
-    // Logo block (replaces text title). Sized large for prominence — height is ~3.5x
-    // the old text title; width is capped so the logo never exceeds half the canvas
-    // width on very wide layouts. Aspect ratio is preserved from the loaded asset.
+    // ---- Layout planning ----
+    // New layout (per user request):
+    //   • Logo: top-left, large.
+    //   • Legend: left column, below the logo.
+    //   • Info row (metadata card + plate-arrangement card side by side):
+    //       middle-right of the canvas, vertically centered against the legend.
+    //   • Preview image: bottom-right, centered on the right-block axis.
+
     const titleFontSize = scalingFactor * 2;
     const logoLoaded = BRICKONAS_LOGO.complete && BRICKONAS_LOGO.naturalWidth > 0;
     const logoAspect = logoLoaded ? BRICKONAS_LOGO.naturalWidth / BRICKONAS_LOGO.naturalHeight : 2.5;
-    let logoTargetHeight = Math.max(titleFontSize * 3.5, 110);
+    let logoTargetHeight = Math.max(titleFontSize * 4.5, 160);
     let logoTargetWidth = logoTargetHeight * logoAspect;
-    // Capped later (after rightBlockWidth is known) to max 70% of right-block width.
-    const titleHeight = logoTargetHeight + scalingFactor * 0.6;
 
-    const metaFontSize = Math.max(scalingFactor / 2, 22);
-    const metaLineGap = metaFontSize * 1.7;
-    // Metadata is drawn as a compact 4-row card with rounded background, so the height
-    // is rows + vertical padding.
-    const metaCardPadV = metaFontSize * 0.7;
-    const metaCardPadH = metaFontSize * 1.1;
+    const metaFontSize = Math.max(scalingFactor / 2, 26);
+    const metaLineGap = metaFontSize * 1.8;
+    const metaCardPadV = metaFontSize * 0.9;
+    const metaCardPadH = metaFontSize * 1.3;
     const metaBlockHeight = metaLineGap * 3 + metaFontSize + metaCardPadV * 2;
-    const titleToMetaGap = scalingFactor * 0.7;
-    const metaToGridGap = scalingFactor * 1.2;
-    const gridToPreviewGap = scalingFactor * 0.8;
 
-    // Preview image: target size before knowing the right-block width. We size it to a
-    // sensible fraction of pictureWidth (capped to pictureHeight) and re-fit later once
-    // the right-block width is known.
     const srcAspect = finalImageCanvas.width / finalImageCanvas.height;
-    const previewMaxHeight = pictureHeight * 0.85;
-    let previewWidthInit = pictureWidth * 0.95;
+    const previewMaxHeight = pictureHeight * 0.95;
+    let previewWidthInit = pictureWidth * 1.0;
     let previewHeightInit = previewWidthInit / srcAspect;
     if (previewHeightInit > previewMaxHeight) {
         previewHeightInit = previewMaxHeight;
@@ -1278,90 +1273,77 @@ function generateInstructionTitlePage(
 
     const gridDrawn = numPlates > 1;
     const gridHeight = gridDrawn ? gridHeaderHeight + legendGridHeight : 0;
-    const rightBlockHeight =
-        titleHeight +
-        titleToMetaGap +
-        metaBlockHeight +
-        (gridDrawn ? metaToGridGap + gridHeight : 0) +
-        gridToPreviewGap +
-        previewHeightInit;
 
-    // Canvas height must accommodate both columns + outer padding.
+    // Canvas dimensions: width is the same as before (2x picture width).
+    // Height must fit the larger of the two columns plus padding.
     const outerPadding = scalingFactor * 1.5;
-    const requiredHeight = Math.max(legendEstHeight, rightBlockHeight) + outerPadding * 2;
+    const logoToLegendGap = scalingFactor * 1.0;
+    const infoRowToPreviewGap = scalingFactor * 1.2;
+    const leftColumnHeight = logoTargetHeight + logoToLegendGap + legendEstHeight;
+    const infoRowHeight = Math.max(metaBlockHeight, gridDrawn ? gridHeight : 0);
+    const rightColumnHeight = infoRowHeight + infoRowToPreviewGap + previewHeightInit;
+
+    const requiredHeight = Math.max(leftColumnHeight, rightColumnHeight) + outerPadding * 2;
     canvas.height = Math.max(pictureHeight * 1.5, requiredHeight);
     canvas.width = pictureWidth * 2;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the legend on the left, vertically centered on the canvas.
-    const legendTop = (canvas.height - legendEstHeight) / 2;
+    // ---- Left column: logo top-left, legend below it ----
+    const leftColumnLeft = outerPadding;
+
+    // Cap logo width to half the canvas width so it never overflows
+    const logoMaxWidth = canvas.width * 0.45;
+    if (logoTargetWidth > logoMaxWidth) {
+        const k = logoMaxWidth / logoTargetWidth;
+        logoTargetWidth = logoMaxWidth;
+        logoTargetHeight = logoTargetHeight * k;
+    }
+
+    const logoX = leftColumnLeft;
+    const logoY = outerPadding;
+    if (logoLoaded) {
+        ctx.drawImage(BRICKONAS_LOGO, logoX, logoY, logoTargetWidth, logoTargetHeight);
+    } else {
+        ctx.fillStyle = "#1B5E20";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.font = `bold ${titleFontSize * 2.2}px Arial`;
+        ctx.fillText("BRICKONAS", logoX, logoY + titleFontSize * 2.2);
+        ctx.textAlign = "start";
+    }
+
+    const legendTop = logoY + logoTargetHeight + logoToLegendGap;
+    // Legend's horizontalOffset corresponds to the swatch center; the box's
+    // left edge is at horizontalOffset - leftPadding (~radius * 1.2). We want
+    // the box-left aligned with leftColumnLeft, so add some indent for the
+    // swatch center.
+    const legendIndent = legendEffectiveScale * 1.2 + legendEffectiveScale; // leftPadding + radius
     const legendBox = drawStudCountForContext(
         studMap,
         availableStudHexList,
         scalingFactor,
         ctx,
-        pictureWidth * 0.25,
+        leftColumnLeft + legendIndent,
         legendTop,
         pixelType
     );
 
-    // Right block: stacked title, metadata, optional plate grid, preview image.
-    // Centered horizontally in the space to the right of the legend, and centered
-    // vertically as one group within the canvas.
-    const rightBlockLeft = legendBox.right + scalingFactor * 2;
+    // ---- Right column: info row (metadata + plate grid side by side) ----
+    const rightBlockLeft = legendBox.right + scalingFactor * 1.5;
     const rightBlockRight = canvas.width - outerPadding;
     const rightBlockCenterX = (rightBlockLeft + rightBlockRight) / 2;
     const rightBlockWidth = rightBlockRight - rightBlockLeft;
 
-    // Re-fit preview to the actual right-block width (it can be narrower than our
-    // initial estimate when the legend is unusually wide).
-    let previewWidth = Math.min(previewWidthInit, rightBlockWidth * 0.98);
+    // Re-fit preview to the actual right-block width
+    let previewWidth = Math.min(previewWidthInit, rightBlockWidth * 1.0);
     let previewHeight = previewWidth / srcAspect;
     if (previewHeight > previewMaxHeight) {
         previewHeight = previewMaxHeight;
         previewWidth = previewHeight * srcAspect;
     }
 
-    // Cap the logo to 70% of the right-block width (proportional scale).
-    const logoMaxWidth = rightBlockWidth * 0.7;
-    if (logoTargetWidth > logoMaxWidth) {
-        const k = logoMaxWidth / logoTargetWidth;
-        logoTargetWidth = logoMaxWidth;
-        logoTargetHeight = logoTargetHeight * k;
-    }
-    const finalTitleHeight = logoTargetHeight + scalingFactor * 0.6;
-
-    const finalRightBlockHeight =
-        finalTitleHeight +
-        titleToMetaGap +
-        metaBlockHeight +
-        (gridDrawn ? metaToGridGap + gridHeight : 0) +
-        gridToPreviewGap +
-        previewHeight;
-    let cursorY = (canvas.height - finalRightBlockHeight) / 2;
-
-    // Title: BRICKONAS logo (falls back to plain text if the image hasn't loaded yet)
-    if (logoLoaded) {
-        ctx.drawImage(
-            BRICKONAS_LOGO,
-            rightBlockCenterX - logoTargetWidth / 2,
-            cursorY,
-            logoTargetWidth,
-            logoTargetHeight
-        );
-    } else {
-        ctx.fillStyle = "#1B5E20";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "alphabetic";
-        ctx.font = `bold ${titleFontSize * 1.6}px Arial`;
-        ctx.fillText("BRICKONAS", rightBlockCenterX, cursorY + titleFontSize * 1.6);
-        ctx.textAlign = "start";
-    }
-    cursorY += finalTitleHeight + titleToMetaGap;
-
-    // Metadata card: rounded light-grey background with two-column layout
-    // (label right-aligned, value left-aligned, separated by a thin vertical line).
+    // Build the metadata card content & measure
     const height = pixelArray.length / (4 * width);
     const widthCm = (width * pixelWidthCm).toFixed(1);
     const heightCm = (height * pixelWidthCm).toFixed(1);
@@ -1371,8 +1353,6 @@ function generateInstructionTitlePage(
         [t('pdfPlateSize'), `${plateWidth} × ${plateHeight}`],
         [t('pdfSize'), `${widthCm} × ${heightCm} cm`],
     ];
-
-    // Measure widest label and widest value to compute card width
     ctx.font = `bold ${metaFontSize}px Arial`;
     let maxLabelW = 0;
     metaRows.forEach((row) => {
@@ -1385,13 +1365,30 @@ function generateInstructionTitlePage(
         const w = ctx.measureText(row[1]).width;
         if (w > maxValueW) maxValueW = w;
     });
-    const colSeparatorGap = metaFontSize * 1.2;
+    const colSeparatorGap = metaFontSize * 1.4;
     const metaCardWidth = metaCardPadH * 2 + maxLabelW + colSeparatorGap + maxValueW;
-    const metaCardLeft = rightBlockCenterX - metaCardWidth / 2;
-    const metaCardTop = cursorY;
 
-    // Background card
-    const metaCardRadius = Math.min(metaFontSize * 0.6, 14);
+    // Plate-arrangement card width = grid width + horizontal padding
+    const gridCardPadH = metaFontSize * 1.0;
+    const gridCardPadV = metaFontSize * 0.6;
+    const gridCardWidth = gridDrawn ? legendGridWidth + gridCardPadH * 2 : 0;
+    const gridCardInnerHeight = gridDrawn ? gridHeaderHeight + legendGridHeight : 0;
+    const gridCardHeight = gridDrawn ? gridCardInnerHeight + gridCardPadV * 1.2 : 0;
+
+    // Compose the info row: meta card + grid card with a gap between them, both
+    // horizontally centered in the right block.
+    const infoCardGap = scalingFactor * 1.2;
+    const infoRowTotalWidth = metaCardWidth + (gridDrawn ? infoCardGap + gridCardWidth : 0);
+    const infoRowLeft = rightBlockCenterX - infoRowTotalWidth / 2;
+    const infoRowVisualHeight = Math.max(metaBlockHeight, gridCardHeight);
+    // Vertically center the info row against the left column's logo+legend group
+    const leftColumnCenterY = logoY + leftColumnHeight / 2;
+    const infoRowTop = leftColumnCenterY - infoRowVisualHeight / 2;
+
+    // --- Metadata card ---
+    const metaCardLeft = infoRowLeft;
+    const metaCardTop = infoRowTop + (infoRowVisualHeight - metaBlockHeight) / 2;
+    const metaCardRadius = Math.min(metaFontSize * 0.6, 16);
     ctx.fillStyle = "#f7f7f7";
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {
@@ -1404,7 +1401,6 @@ function generateInstructionTitlePage(
     ctx.strokeStyle = "#dddddd";
     ctx.stroke();
 
-    // Vertical separator between label and value columns
     const sepX = metaCardLeft + metaCardPadH + maxLabelW + colSeparatorGap / 2;
     ctx.strokeStyle = "#dddddd";
     ctx.lineWidth = 1;
@@ -1413,11 +1409,10 @@ function generateInstructionTitlePage(
     ctx.lineTo(sepX, metaCardTop + metaBlockHeight - metaCardPadV * 0.6);
     ctx.stroke();
 
-    // Rows
     const labelX = sepX - colSeparatorGap / 2;
     const valueX = sepX + colSeparatorGap / 2;
     let metaRowY = metaCardTop + metaCardPadV + metaFontSize;
-    metaRows.forEach(([label, value], i) => {
+    metaRows.forEach(([label, value]) => {
         ctx.textBaseline = "alphabetic";
         ctx.fillStyle = "#444444";
         ctx.font = `bold ${metaFontSize}px Arial`;
@@ -1430,35 +1425,36 @@ function generateInstructionTitlePage(
         metaRowY += metaLineGap;
     });
     ctx.textAlign = "start";
-    cursorY += metaBlockHeight;
 
-    // Plate grid (only when >1 plate) — centered on the right-block axis.
-    // Styled as a card: header label, light cells with rounded corners,
-    // bold centered numbers, dezenter dark grey border.
+    // --- Plate grid card (only when >1 plate) ---
     if (gridDrawn) {
-        cursorY += metaToGridGap;
+        const gridCardLeft = metaCardLeft + metaCardWidth + infoCardGap;
+        const gridCardTop = infoRowTop + (infoRowVisualHeight - gridCardHeight) / 2;
 
         // Header label
         ctx.fillStyle = "#444444";
         ctx.font = `bold ${gridHeaderFontSize}px Arial`;
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";
-        ctx.fillText("Plattenanordnung", rightBlockCenterX, cursorY + gridHeaderFontSize);
-        cursorY += gridHeaderHeight;
+        ctx.fillText(
+            "Plattenanordnung",
+            gridCardLeft + gridCardWidth / 2,
+            gridCardTop + gridHeaderFontSize
+        );
 
-        const gridLeftX = rightBlockCenterX - (legendGridWidth / 2);
-        const cellRadius = Math.min(legendSquareSide * 0.12, 8);
-        const cellPad = 2;
+        const gridStartY = gridCardTop + gridHeaderHeight;
+        const gridLeftX = gridCardLeft + (gridCardWidth - legendGridWidth) / 2;
+        const cellRadius = Math.min(legendSquareSide * 0.14, 12);
+        const cellPad = 3;
 
         for (var i = 0; i < numPlates; i++) {
             const horIndex = ((i * plateWidth) % width) / plateWidth;
             const vertIndex = Math.floor((i * plateWidth) / width);
             const cellX = gridLeftX + horIndex * legendSquareSide + cellPad;
-            const cellY = cursorY + vertIndex * legendSquareSide + cellPad;
+            const cellY = gridStartY + vertIndex * legendSquareSide + cellPad;
             const cellW = legendSquareSide - cellPad * 2;
             const cellH = legendSquareSide - cellPad * 2;
 
-            // Light fill
             ctx.fillStyle = "#f7f7f7";
             ctx.beginPath();
             if (typeof ctx.roundRect === "function") {
@@ -1467,32 +1463,27 @@ function generateInstructionTitlePage(
                 ctx.rect(cellX, cellY, cellW, cellH);
             }
             ctx.fill();
-
-            // Border
             ctx.lineWidth = 1.5;
             ctx.strokeStyle = "#888888";
             ctx.stroke();
 
-            // Centered bold number
             ctx.fillStyle = "#1a1a1a";
             ctx.font = `bold ${legendSquareSide * 0.45}px Arial`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(
-                i + 1,
-                cellX + cellW / 2,
-                cellY + cellH / 2 + 1
-            );
+            ctx.fillText(i + 1, cellX + cellW / 2, cellY + cellH / 2 + 1);
         }
         ctx.textAlign = "start";
         ctx.textBaseline = "alphabetic";
-        cursorY += legendGridHeight;
     }
 
-    // Preview image, centered horizontally on the right-block axis
-    cursorY += gridToPreviewGap;
+    // ---- Preview image: bottom-right, centered on the right-block axis ----
     const previewHorizontalOffset = rightBlockCenterX - previewWidth / 2;
-    const previewVerticalOffset = cursorY;
+    let previewVerticalOffset = infoRowTop + infoRowVisualHeight + infoRowToPreviewGap;
+    // If the preview would overflow the canvas bottom, pull it up
+    if (previewVerticalOffset + previewHeight > canvas.height - outerPadding) {
+        previewVerticalOffset = canvas.height - outerPadding - previewHeight;
+    }
     ctx.drawImage(
         finalImageCanvas,
         0,
@@ -1528,7 +1519,7 @@ function generateInstructionPage(
 
     // Match the legend's minimum-size logic so the canvas reserves enough room
     // for the readable legend at high resolutions (small scalingFactor).
-    const PAGE_MIN_LEGEND_FONT = 22;
+    const PAGE_MIN_LEGEND_FONT = 26;
     const pageLegendScale = Math.max(scalingFactor, PAGE_MIN_LEGEND_FONT * 2);
     const pageLegendRowHeight = pageLegendScale * 1.3;
     const pageLegendHeight =
