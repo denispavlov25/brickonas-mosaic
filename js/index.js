@@ -3852,13 +3852,13 @@ function goToStep(stepNumber) {
         { id: "original", labelKey: "styleOriginal", labelDe: "Original",
           hue: 0, saturation: 0, value: 0, brightness: 0, contrast: 0 },
         { id: "dark", labelKey: "styleDark", labelDe: "Dunkel",
-          hue: 0, saturation: 30, value: -40, brightness: -45, contrast: 70 },
+          hue: 0, saturation: 20, value: -25, brightness: -30, contrast: 50 },
         { id: "soft", labelKey: "styleSoft", labelDe: "Hell",
-          hue: 0, saturation: -40, value: 35, brightness: 50, contrast: -30 },
+          hue: 0, saturation: -25, value: 25, brightness: 35, contrast: -20 },
         { id: "warm", labelKey: "styleWarm", labelDe: "Warm",
-          hue: 15, saturation: 50, value: 10, brightness: 25, contrast: 25 },
+          hue: 10, saturation: 30, value: 5, brightness: 15, contrast: 15 },
         { id: "mono", labelKey: "styleMono", labelDe: "S/W",
-          hue: 0, saturation: -100, value: 0, brightness: 0, contrast: 40 },
+          hue: 0, saturation: -100, value: 0, brightness: 0, contrast: 30 },
     ];
 
     var picker = document.getElementById("bk-style-picker");
@@ -4010,28 +4010,12 @@ function goToStep(stepNumber) {
             tile.appendChild(label);
             tile.addEventListener("click", function() {
                 if (selectedStyleId === preset.id) return;
-                if (grid.dataset.busy === "1") return; // ignore clicks during processing
                 selectedStyleId = preset.id;
                 grid.querySelectorAll(".bk-style-tile").forEach(function(t) {
                     t.classList.toggle("active", t.dataset.style === preset.id);
                 });
                 applyStyle(preset);
-                // Invalidate downstream steps so runStepProcessing actually
-                // re-runs them with the new slider values.
-                if (typeof invalidateStepsFrom === "function") invalidateStepsFrom(2);
-                grid.dataset.busy = "1";
-                var safetyTimeout = setTimeout(function() {
-                    grid.dataset.busy = "";
-                }, 8000);
-                if (typeof runStepProcessing === "function") {
-                    runStepProcessing(3, function() {
-                        clearTimeout(safetyTimeout);
-                        grid.dataset.busy = "";
-                    });
-                } else {
-                    clearTimeout(safetyTimeout);
-                    grid.dataset.busy = "";
-                }
+                if (typeof runStep2 === "function") runStep2();
             });
             grid.appendChild(tile);
         });
