@@ -3947,46 +3947,31 @@ function goToStep(stepNumber) {
         }
     }
 
-    function getPreviewSourceCanvas() {
-        // Prefer the small step-2-canvas (already-pixelated mosaic image,
-        // guaranteed populated when we're on visual step 2). Fall back to
-        // the cropper canvas if step-2-canvas isn't ready yet.
-        var src = document.getElementById("step-2-canvas");
-        if (src && src.width > 0 && src.height > 0) return src;
-        if (typeof inputImageCropper !== "undefined" && inputImageCropper) {
-            try {
-                return inputImageCropper.getCroppedCanvas({
-                    width: 128, height: 128, imageSmoothingEnabled: true,
-                });
-            } catch (e) {}
-        }
-        return null;
-    }
-
     function renderTilePreviews() {
-        var src = getPreviewSourceCanvas();
-        if (!src || !src.width || !src.height) {
-            // Try again next frame — step-2-canvas might still be 0×0.
-            requestAnimationFrame(renderTilePreviews);
-            return;
-        }
-        var TILE = 96;
-        // Read source pixels once into a temporary canvas at TILE×TILE.
-        var tmp = document.createElement("canvas");
-        tmp.width = TILE; tmp.height = TILE;
-        var tmpCtx = tmp.getContext("2d");
-        tmpCtx.imageSmoothingEnabled = true;
-        tmpCtx.drawImage(src, 0, 0, TILE, TILE);
-        var srcImageData = tmpCtx.getImageData(0, 0, TILE, TILE);
+        // Use the cropped source canvas. inputImageCropper.getCroppedCanvas()
+        // is the same call runStep2 makes, so the previews match what the
+        // user is about to see.
+        if (typeof inputImageCropper === "undefined" || !inputImageCropper) return;
+        var src;
+        try {
+            src = inputImageCropper.getCroppedCanvas({
+                width: 96, height: 96, imageSmoothingEnabled: true,
+            });
+        } catch (e) { return; }
+        if (!src) return;
+        // Read source pixels once.
+        var srcCtx = src.getContext("2d");
+        var srcImageData = srcCtx.getImageData(0, 0, 96, 96);
         var tiles = grid.querySelectorAll(".bk-style-tile");
         tiles.forEach(function(tile) {
             var preset = BK_STYLE_PRESETS.find(function(p) { return p.id === tile.dataset.style; });
             if (!preset) return;
             var canvas = tile.querySelector("canvas.bk-style-tile-preview");
             if (!canvas) return;
-            canvas.width = TILE; canvas.height = TILE;
+            canvas.width = 96; canvas.height = 96;
             var ctx = canvas.getContext("2d");
-            var imgData = ctx.createImageData(TILE, TILE);
+            // Make a fresh copy of the source pixels for each tile.
+            var imgData = ctx.createImageData(96, 96);
             imgData.data.set(srcImageData.data);
             applyPresetToImageData(imgData.data, preset);
             ctx.putImageData(imgData, 0, 0);
