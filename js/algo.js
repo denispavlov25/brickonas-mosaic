@@ -1033,6 +1033,29 @@ function drawStudCountForContext(
     pixelType
 ) {
     const radius = scalingFactor / 2;
+    const isVariable = ("" + pixelType).match("^variable.*$");
+
+    // Measure the widest "X N" + color name combo so the legend box never clips long names
+    // like "Leuchtend Hellorange" or "Dunkel Bläulichgrau". We pick the larger of the two fonts
+    // (count font is scalingFactor/2; name font is scalingFactor/2.5) for each row.
+    let maxRowTextWidth = 0;
+    availableStudHexList.forEach((pixelHex) => {
+        const countText = isVariable ? "" : `X ${studMap[pixelHex] || 0}  `;
+        const colorText = translateColor(HEX_TO_COLOR_NAME[pixelHex]) || pixelHex;
+        ctx.font = `${scalingFactor / 2}px Arial`;
+        const countW = ctx.measureText(countText).width;
+        ctx.font = `${scalingFactor / 2.5}px Arial`;
+        const nameW = ctx.measureText(colorText).width;
+        const rowW = Math.max(countW, nameW);
+        if (rowW > maxRowTextWidth) maxRowTextWidth = rowW;
+    });
+
+    // Box layout: left padding + swatch (radius*2) + gap + text column + right padding.
+    const leftPadding = radius * 2;
+    const swatchToTextGap = radius * 1.5;
+    const rightPadding = radius * 1.5;
+    const boxWidth = leftPadding + radius * 2 + swatchToTextGap + maxRowTextWidth + rightPadding;
+
     ctx.font = `${scalingFactor / 2}px Arial`;
     availableStudHexList.forEach((pixelHex, i) => {
         const number = i + 1;
@@ -1051,7 +1074,7 @@ function drawStudCountForContext(
         ctx.fillStyle = inverseHex(pixelHex);
         ctx.fillText(number, x - (scalingFactor * (1 + Math.floor(number / 2) / 6)) / 8, y + scalingFactor / 8);
         ctx.fillStyle = "#000000";
-        if (!("" + pixelType).match("^variable.*$")) {
+        if (!isVariable) {
             ctx.fillText(`X ${studMap[pixelHex] || 0}`, x + radius * 1.5, y);
         }
         ctx.font = `${scalingFactor / 2.5}px Arial`;
@@ -1063,9 +1086,9 @@ function drawStudCountForContext(
     ctx.strokeStyle = "#000000";
     ctx.beginPath();
     ctx.rect(
-        horizontalOffset - radius * 2,
+        horizontalOffset - leftPadding,
         verticalOffset + radius * 0.75,
-        radius * 11,
+        boxWidth,
         radius * 2.5 * (availableStudHexList.length + 0.5)
     );
     ctx.stroke();
@@ -1100,9 +1123,11 @@ function generateInstructionTitlePage(
     const legendGridWidth = legendSquareSide * platesPerRow;
     const legendGridHeight = legendSquareSide * platesPerCol;
     
-    // Calculate total height needed: title area + grid + gap + preview image + padding
+    // Calculate total height needed: title area + grid + gap + preview image + padding.
+    // The preview image is now sized to ~90% of pictureHeight (see drawImage below) to stay
+    // large even for low-resolution / single-plate mosaics, so reserve that much vertical room.
     const titleAreaHeight = pictureHeight * 0.45;
-    const previewImageHeight = legendGridHeight;
+    const previewImageHeight = pictureHeight * 0.9;
     const gapBetween = scalingFactor;
     const totalContentHeight = titleAreaHeight + legendGridHeight + gapBetween + previewImageHeight + scalingFactor;
     
@@ -1180,7 +1205,23 @@ function generateInstructionTitlePage(
         ctx.stroke();
     }
     
-    // Draw the preview image BELOW the numbered grid
+    // Draw the preview image BELOW the numbered grid.
+    // Size it to a sensible fraction of the page width so it stays large even for low-res
+    // single-plate mosaics (48x48 / 1 plate would otherwise render tiny). Aspect ratio is
+    // preserved from the source image, and the box is horizontally centered in the right
+    // half of the page (where the title and plate grid live).
+    const rightHalfStart = pictureWidth * 0.75;
+    const rightHalfWidth = canvas.width - rightHalfStart;
+    const previewMaxWidth = rightHalfWidth * 0.7;
+    const previewMaxHeight = pictureHeight * 0.9;
+    const srcAspect = finalImageCanvas.width / finalImageCanvas.height;
+    let previewWidth = previewMaxWidth;
+    let previewHeight = previewWidth / srcAspect;
+    if (previewHeight > previewMaxHeight) {
+        previewHeight = previewMaxHeight;
+        previewWidth = previewHeight * srcAspect;
+    }
+    const previewHorizontalOffset = rightHalfStart + (rightHalfWidth - previewWidth) / 2;
     const previewVerticalOffset = legendVerticalOffset + legendGridHeight + gapBetween;
     ctx.drawImage(
         finalImageCanvas,
@@ -1188,10 +1229,10 @@ function generateInstructionTitlePage(
         0,
         finalImageCanvas.width,
         finalImageCanvas.height,
-        legendHorizontalOffset,
+        previewHorizontalOffset,
         previewVerticalOffset,
-        legendGridWidth,
-        previewImageHeight
+        previewWidth,
+        previewHeight
     );
 }
 
