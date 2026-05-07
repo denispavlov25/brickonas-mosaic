@@ -3211,27 +3211,14 @@ document.getElementById("input-image-selector").addEventListener("click", () => 
 // path as a user file upload, so all downstream logic (cropping, resolution
 // selection, mosaic generation) works identically.
 (function setupExampleImagePicker() {
-    var wrap = document.getElementById("mosaic-examples");
     var grid = document.getElementById("mosaic-examples-grid");
-    if (!wrap || !grid) return;
+    if (!grid) return;
 
-    // Per-card load probe: hide cards whose image fails to load, and only
-    // reveal the section if at least one card succeeds. Keeps the UI clean
-    // if some example assets are missing.
-    var cards = grid.querySelectorAll(".mosaic-example-card");
-    var revealed = false;
-    cards.forEach(function (card) {
-        var img = card.querySelector("img");
-        if (!img) return;
-        if (img.complete && img.naturalWidth > 0) {
-            if (!revealed) { wrap.hidden = false; revealed = true; }
-            return;
-        }
-        img.addEventListener("load", function () {
-            if (!revealed) { wrap.hidden = false; revealed = true; }
-        });
+    // Hide individual cards whose image fails to load.
+    grid.querySelectorAll(".mosaic-example-card img").forEach(function (img) {
         img.addEventListener("error", function () {
-            card.style.display = "none";
+            var card = img.closest(".mosaic-example-card");
+            if (card) card.style.display = "none";
         });
     });
 
