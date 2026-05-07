@@ -7,13 +7,6 @@ const BRICKONAS_LOGO = (function () {
     return img;
 })();
 
-// Preload Playfair Display so the "BrickPic" subtitle on the title page is drawn
-// in the right typeface even when canvas rendering happens before the browser
-// has lazy-loaded the webfont. Failure here is silent — the title page falls
-// back to Georgia.
-if (typeof document !== "undefined" && document.fonts && document.fonts.load) {
-    document.fonts.load("italic 700 64px 'Playfair Display'").catch(function () {});
-}
 
 function hexToRgb(hex) {
     const hexInt = parseInt(hex.replace("#", ""), 16);
@@ -1406,8 +1399,10 @@ function generateInstructionTitlePage(
     const topRowTop = rightBlockTop + subTitleHeight;
 
     // ---- "BrickPic" subtitle above the info row, left-aligned with the row ----
+    // Matches the website's "Mosaik BrickPic" nav button: Nunito 700, upright,
+    // dark BRICKONAS green.
     ctx.fillStyle = subTitleColor;
-    ctx.font = `italic 700 ${subTitleFontSize}px "Playfair Display", Georgia, "Times New Roman", serif`;
+    ctx.font = `700 ${subTitleFontSize}px "Nunito", "Helvetica Neue", Arial, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     ctx.fillText("BrickPic", topRowLeft, rightBlockTop + subTitleFontSize * 1.05);
