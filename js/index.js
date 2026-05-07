@@ -3332,6 +3332,7 @@ function showVisualStep(vstep) {
     }
 
     currentVisualStep = vstep;
+    document.dispatchEvent(new CustomEvent('bk-visual-step-change', { detail: { step: vstep } }));
 
     // When returning to step 1, Cropper.js must be fully reinitialized.
     // The hidden attribute (display:none) makes Cropper lose all internal
@@ -3839,5 +3840,284 @@ function goToStep(stepNumber) {
         showVisualStep(3);
     }
 }
+
+// === STYLE PICKER (step 2) ===
+// Approach: each style is a curated SUBSET of the active palette. Clicking
+// a tile rebuilds the configurator's stud table with that subset and
+// triggers runCustomStudMap() — the same path the existing preset dropdown
+// uses. No HSV / brightness / contrast filtering, no race conditions.
+//
+// The "Original" tile restores the user's full default palette (whatever
+// it was when they entered step 2 the first time).
+(function setupStylePicker() {
+    // Curated colour subsets, by hex. Each list is small enough to give a
+    // strong visual identity but big enough to keep the photo recognisable.
+    // Hex codes match those in bricklink-colors.js. If a hex isn't in the
+    // active palette (e.g. it's hidden via BK_HIDDEN_COLOR_NAMES), it is
+    // silently dropped at click time.
+    var BK_STYLE_PALETTES = {
+        dark: [
+            "#212121", // Black
+            "#330000", // Dark Brown
+            "#532115", // Brown
+            "#6a0e15", // Dark Red
+            "#143044", // Dark Blue
+            "#2e5543", // Dark Green
+            "#595d60", // Dark Bluish Gray
+            "#6b5a5a", // Dark Gray
+            "#666660", // Pearl Dark Gray
+            "#89351d", // Reddish Brown
+            "#7c9051", // Olive Green
+            "#5a7184", // Sand Blue
+            "#8c6b6b", // Sand Red
+            "#b30006", // Red — accent
+        ],
+        soft: [
+            "#ffffff", // White
+            "#e8e8e8", // Very Light Gray
+            "#e4e8e8", // Very Light Bluish Gray
+            "#feccb0", // Light Nougat
+            "#ffaf7d", // Nougat
+            "#ffdedc", // Light Salmon
+            "#ffe1ff", // Light Pink
+            "#ffc0cb", // Pink
+            "#b4d2e3", // Light Blue
+            "#9fc3e9", // Bright Light Blue
+            "#a5dbb5", // Light Green
+            "#ffe383", // Light Yellow
+            "#f3e055", // Bright Light Yellow
+            "#dec69c", // Tan
+            "#e6c05d", // Very Light Orange
+            "#c9cae2", // Light Violet
+        ],
+        warm: [
+            "#ffffff", // White (highlights)
+            "#212121", // Black (definition)
+            "#fffc00", // Neon Yellow
+            "#f7d117", // Yellow
+            "#ffa531", // Medium Orange
+            "#ff7e14", // Orange
+            "#fa5947", // Neon Orange
+            "#b30006", // Red
+            "#b35408", // Dark Orange
+            "#89351d", // Reddish Brown
+            "#532115", // Brown
+            "#dec69c", // Tan
+            "#feccb0", // Light Nougat
+            "#ffaf7d", // Nougat
+            "#e3a05b", // Medium Nougat
+            "#f7ba30", // Bright Light Orange
+            "#dd982e", // Dark Yellow
+            "#f88379", // Coral
+        ],
+        mono: [
+            "#ffffff", // White
+            "#e8e8e8", // Very Light Gray
+            "#afb5c7", // Light Bluish Gray
+            "#9c9c9c", // Light Gray
+            "#6b5a5a", // Dark Gray
+            "#595d60", // Dark Bluish Gray
+            "#212121", // Black
+        ],
+    };
+
+    var BK_STYLE_PRESETS = [
+        { id: "original", labelKey: "styleOriginal", labelDe: "Original" },
+        { id: "dark",     labelKey: "styleDark",     labelDe: "Dunkel"   },
+        { id: "soft",     labelKey: "styleSoft",     labelDe: "Hell"     },
+        { id: "warm",     labelKey: "styleWarm",     labelDe: "Warm"     },
+        { id: "mono",     labelKey: "styleMono",     labelDe: "S/W"      },
+    ];
+
+    var picker = document.getElementById("bk-style-picker");
+    var grid = document.getElementById("bk-style-picker-grid");
+    if (!picker || !grid) return;
+
+    var selectedStyleId = "original";
+    var tilesBuilt = false;
+    // Snapshot of the user's original palette the first time they reach
+    // step 2. The "Original" tile restores this. We snapshot once so that
+    // selecting another tile and then clicking Original reverts cleanly.
+    var originalPaletteSnapshot = null;
+
+    function snapshotOriginalPaletteIfNeeded() {
+        if (originalPaletteSnapshot) return;
+        if (typeof selectedStudMap === "undefined" || !selectedStudMap) return;
+        // Deep-clone — selectedStudMap mutates as the user edits the table.
+        originalPaletteSnapshot = JSON.parse(JSON.stringify(selectedStudMap));
+    }
+
+    function getActivePaletteHexes() {
+        if (typeof ALL_BRICKLINK_SOLID_COLORS !== "undefined") {
+            return new Set(ALL_BRICKLINK_SOLID_COLORS.map(function(c) { return c.hex.toLowerCase(); }));
+        }
+        return null;
+    }
+
+    function buildStudMapFromHexList(hexList) {
+        // Filter against the active palette so hidden colours (and any typos)
+        // are silently dropped. Each entry counts as "infinite" so the colour
+        // matcher uses it freely.
+        var active = getActivePaletteHexes();
+        var map = {};
+        hexList.forEach(function(hex) {
+            var h = hex.toLowerCase();
+            if (active && !active.has(h)) return;
+            map[h] = 99999;
+        });
+        return map;
+    }
+
+    function applyStyleStudMap(styleId) {
+        var newMap;
+        if (styleId === "original") {
+            newMap = originalPaletteSnapshot
+                ? JSON.parse(JSON.stringify(originalPaletteSnapshot))
+                : selectedStudMap;
+        } else {
+            var hexes = BK_STYLE_PALETTES[styleId] || [];
+            newMap = buildStudMapFromHexList(hexes);
+        }
+        if (!newMap || Object.keys(newMap).length === 0) return false;
+
+        // Push the new palette into the configurator's custom stud table
+        // (so the existing pipeline picks it up via runCustomStudMap).
+        if (typeof customStudTableBody !== "undefined" && customStudTableBody) {
+            customStudTableBody.innerHTML = "";
+        }
+        if (typeof mixInStudMap === "function") {
+            // mixInStudMap expects a stud-map object with sortedStuds + studMap
+            mixInStudMap({
+                sortedStuds: Object.keys(newMap),
+                studMap: newMap,
+            }, false);
+        }
+        if (typeof runCustomStudMap === "function") {
+            runCustomStudMap();
+        }
+        return true;
+    }
+
+    // Render each style tile as a real mini-mosaic preview using the same
+    // alignPixelsToStudMap logic the full pipeline uses, but with the
+    // tile's own palette.
+    function renderTilePreviews() {
+        var src = document.getElementById("step-2-canvas");
+        if (!src || !src.width || !src.height) {
+            requestAnimationFrame(renderTilePreviews);
+            return;
+        }
+        var GRID = Math.min(32, src.width);
+        var DOT = 4;
+
+        var tmp = document.createElement("canvas");
+        tmp.width = GRID; tmp.height = GRID;
+        var tmpCtx = tmp.getContext("2d");
+        tmpCtx.imageSmoothingEnabled = true;
+        tmpCtx.drawImage(src, 0, 0, GRID, GRID);
+        var basePixels = tmpCtx.getImageData(0, 0, GRID, GRID).data;
+        var distFn = (typeof colorDistanceFunction !== "undefined") ? colorDistanceFunction : null;
+        var canMatch = distFn && typeof alignPixelsToStudMap === "function";
+
+        var tiles = grid.querySelectorAll(".bk-style-tile");
+        tiles.forEach(function(tile) {
+            var preset = BK_STYLE_PRESETS.find(function(p) { return p.id === tile.dataset.style; });
+            if (!preset) return;
+            var canvas = tile.querySelector("canvas.bk-style-tile-preview");
+            if (!canvas) return;
+
+            // Pick the palette for this tile.
+            var paletteMap;
+            if (preset.id === "original") {
+                paletteMap = originalPaletteSnapshot || selectedStudMap;
+            } else {
+                paletteMap = buildStudMapFromHexList(BK_STYLE_PALETTES[preset.id] || []);
+            }
+            if (!paletteMap || Object.keys(paletteMap).length === 0) return;
+
+            // Color-match the tile's pixels against this palette.
+            var pix = new Uint8ClampedArray(basePixels);
+            var aligned = canMatch ? alignPixelsToStudMap(pix, paletteMap, distFn) : pix;
+
+            canvas.width = GRID * DOT;
+            canvas.height = GRID * DOT;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            var radius = DOT / 2;
+            for (var i = 0; i < GRID * GRID; i++) {
+                var r = aligned[i * 4], g = aligned[i * 4 + 1], b = aligned[i * 4 + 2];
+                ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+                var x = (i % GRID) * DOT + radius;
+                var y = Math.floor(i / GRID) * DOT + radius;
+                ctx.beginPath();
+                ctx.arc(x, y, radius - 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+
+    function buildTilesOnce() {
+        if (tilesBuilt) return;
+        BK_STYLE_PRESETS.forEach(function(preset) {
+            var tile = document.createElement("button");
+            tile.type = "button";
+            tile.className = "bk-style-tile" + (preset.id === selectedStyleId ? " active" : "");
+            tile.dataset.style = preset.id;
+            var canvas = document.createElement("canvas");
+            canvas.className = "bk-style-tile-preview";
+            tile.appendChild(canvas);
+            var label = document.createElement("span");
+            label.className = "bk-style-tile-label";
+            label.setAttribute("data-i18n", preset.labelKey);
+            label.textContent = preset.labelDe;
+            tile.appendChild(label);
+            tile.addEventListener("click", function() {
+                if (selectedStyleId === preset.id) return;
+                if (grid.dataset.busy === "1") return;
+                selectedStyleId = preset.id;
+                grid.querySelectorAll(".bk-style-tile").forEach(function(t) {
+                    t.classList.toggle("active", t.dataset.style === preset.id);
+                });
+                grid.dataset.busy = "1";
+                var safety = setTimeout(function() { grid.dataset.busy = ""; }, 6000);
+                var ok = applyStyleStudMap(preset.id);
+                if (!ok) {
+                    grid.dataset.busy = "";
+                    clearTimeout(safety);
+                    return;
+                }
+                // Poll stepProcessed[3] which flips true once the mosaic
+                // has re-rendered with the new palette.
+                var start = Date.now();
+                var poll = setInterval(function() {
+                    if (typeof stepProcessed !== "undefined" && stepProcessed[3]) {
+                        clearInterval(poll);
+                        clearTimeout(safety);
+                        grid.dataset.busy = "";
+                    } else if (Date.now() - start > 6000) {
+                        clearInterval(poll);
+                    }
+                }, 80);
+            });
+            grid.appendChild(tile);
+        });
+        tilesBuilt = true;
+    }
+
+    document.addEventListener("bk-visual-step-change", function(e) {
+        var step = e && e.detail && e.detail.step;
+        if (step === 2) {
+            snapshotOriginalPaletteIfNeeded();
+            buildTilesOnce();
+            picker.hidden = false;
+            requestAnimationFrame(function() {
+                requestAnimationFrame(renderTilePreviews);
+            });
+        } else {
+            picker.hidden = true;
+        }
+    });
+})();
 
 enableInteraction(); // enable interaction once everything has loaded in
