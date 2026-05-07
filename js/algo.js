@@ -1032,68 +1032,159 @@ function drawStudCountForContext(
     verticalOffset,
     pixelType
 ) {
-    const radius = scalingFactor / 2;
     const isVariable = ("" + pixelType).match("^variable.*$");
 
-    // Measure the widest "X N" + color name combo so the legend box never clips long names
-    // like "Leuchtend Hellorange" or "Dunkel Bläulichgrau". We pick the larger of the two fonts
-    // (count font is scalingFactor/2; name font is scalingFactor/2.5) for each row.
+    // Use a minimum font size so the legend stays readable at high resolutions
+    // (e.g. 288x288 mosaics where scalingFactor is small). The legend's geometry
+    // is then driven by `effectiveScale`, decoupling it from the picture grid.
+    const MIN_LEGEND_FONT = 22;
+    const countFontSize = Math.max(scalingFactor / 2, MIN_LEGEND_FONT);
+    const nameFontSize = Math.max(scalingFactor / 2.5, MIN_LEGEND_FONT * 0.85);
+    const effectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT * 2);
+    const radius = effectiveScale / 2;
+
+    // Measure widest row text so long names like "Leuchtend Hellorange" never clip.
     let maxRowTextWidth = 0;
     availableStudHexList.forEach((pixelHex) => {
         const countText = isVariable ? "" : `X ${studMap[pixelHex] || 0}  `;
         const colorText = translateColor(HEX_TO_COLOR_NAME[pixelHex]) || pixelHex;
-        ctx.font = `${scalingFactor / 2}px Arial`;
+        ctx.font = `${countFontSize}px Arial`;
         const countW = ctx.measureText(countText).width;
-        ctx.font = `${scalingFactor / 2.5}px Arial`;
+        ctx.font = `${nameFontSize}px Arial`;
         const nameW = ctx.measureText(colorText).width;
         const rowW = Math.max(countW, nameW);
         if (rowW > maxRowTextWidth) maxRowTextWidth = rowW;
     });
 
-    // Box layout: left padding + swatch (radius*2) + gap + text column + right padding.
-    const leftPadding = radius * 2;
-    const swatchToTextGap = radius * 1.5;
-    const rightPadding = radius * 1.5;
-    const boxWidth = leftPadding + radius * 2 + swatchToTextGap + maxRowTextWidth + rightPadding;
+    // Header text (also factor into width)
+    const headerFontSize = countFontSize * 1.05;
+    ctx.font = `bold ${headerFontSize}px Arial`;
+    const headerText = (typeof t === "function" ? (t("pdfLegendHeader") || "Farben") : "Farben");
+    const headerW = ctx.measureText(headerText).width;
 
-    ctx.font = `${scalingFactor / 2}px Arial`;
+    // Box layout: left padding + swatch (radius*2) + gap + text column + right padding.
+    const leftPadding = radius * 1.2;
+    const swatchToTextGap = radius * 0.9;
+    const rightPadding = radius * 1.2;
+    const rowHeight = radius * 2.6;
+    const headerHeight = headerFontSize * 1.8;
+    const topPadding = headerHeight + radius * 0.4;
+    const bottomPadding = radius * 0.6;
+    const contentWidth = radius * 2 + swatchToTextGap + maxRowTextWidth;
+    const innerWidth = Math.max(contentWidth, headerW);
+    const boxWidth = leftPadding + innerWidth + rightPadding;
+    const boxHeight = topPadding + rowHeight * availableStudHexList.length + bottomPadding;
+
+    const boxLeft = horizontalOffset - leftPadding;
+    const boxTop = verticalOffset;
+
+    // Box: rounded corners, subtle border, optional zebra rows for readability.
+    const cornerRadius = Math.min(radius * 0.6, 14);
+    function strokeOrFillRoundRect(x, y, w, h, r, fill) {
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(x, y, w, h, r);
+        } else {
+            // Fallback path for older canvas implementations
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+        if (fill) ctx.fill();
+        else ctx.stroke();
+    }
+
+    // Zebra row backgrounds (very light grey on every other row, beneath the text).
+    ctx.fillStyle = "#f5f5f5";
+    for (let i = 0; i < availableStudHexList.length; i++) {
+        if (i % 2 === 0) continue;
+        ctx.fillRect(
+            boxLeft + 2,
+            boxTop + topPadding + i * rowHeight,
+            boxWidth - 4,
+            rowHeight
+        );
+    }
+
+    // Header background bar
+    ctx.fillStyle = "#2E7D32";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+        // Top corners rounded, bottom flush with row area
+        ctx.roundRect(boxLeft, boxTop, boxWidth, headerHeight, [cornerRadius, cornerRadius, 0, 0]);
+    } else {
+        ctx.rect(boxLeft, boxTop, boxWidth, headerHeight);
+    }
+    ctx.fill();
+
+    // Header text, centered in the header bar
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${headerFontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(headerText, boxLeft + boxWidth / 2, boxTop + headerHeight / 2);
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
+
+    // Rows: swatch + (count) + name
     availableStudHexList.forEach((pixelHex, i) => {
         const number = i + 1;
-        ctx.beginPath();
-        const x = horizontalOffset;
-        const y = verticalOffset + radius * 2.5 * number;
+        const rowCenterY = boxTop + topPadding + i * rowHeight + rowHeight / 2;
+        const swatchCx = boxLeft + leftPadding + radius;
         drawPixel(
             ctx,
-            x - radius,
-            y - radius,
+            swatchCx - radius,
+            rowCenterY - radius,
             radius,
             pixelHex,
             inverseHex(pixelHex),
             PIXEL_TYPE_TO_FLATTENED[pixelType]
         );
+        // Number inside the swatch
         ctx.fillStyle = inverseHex(pixelHex);
-        ctx.fillText(number, x - (scalingFactor * (1 + Math.floor(number / 2) / 6)) / 8, y + scalingFactor / 8);
-        ctx.fillStyle = "#000000";
+        ctx.font = `${countFontSize}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(number, swatchCx, rowCenterY);
+
+        // "X N" count + color name to the right of the swatch, two-line stacked
+        const textX = swatchCx + radius + swatchToTextGap;
+        ctx.fillStyle = "#202020";
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
         if (!isVariable) {
-            ctx.fillText(`X ${studMap[pixelHex] || 0}`, x + radius * 1.5, y);
+            ctx.font = `${countFontSize}px Arial`;
+            ctx.fillText(`X ${studMap[pixelHex] || 0}`, textX, rowCenterY - countFontSize * 0.05);
         }
-        ctx.font = `${scalingFactor / 2.5}px Arial`;
-        ctx.fillText(translateColor(HEX_TO_COLOR_NAME[pixelHex]) || pixelHex, x + radius * 1.5, y + scalingFactor / 2.5);
-        ctx.font = `${scalingFactor / 2}px Arial`;
+        ctx.fillStyle = "#555555";
+        ctx.font = `${nameFontSize}px Arial`;
+        ctx.fillText(
+            translateColor(HEX_TO_COLOR_NAME[pixelHex]) || pixelHex,
+            textX,
+            rowCenterY + nameFontSize * 1.0
+        );
     });
 
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#000000";
-    const boxLeft = horizontalOffset - leftPadding;
-    ctx.beginPath();
-    ctx.rect(
-        boxLeft,
-        verticalOffset + radius * 0.75,
-        boxWidth,
-        radius * 2.5 * (availableStudHexList.length + 0.5)
-    );
-    ctx.stroke();
-    return { left: boxLeft, right: boxLeft + boxWidth, width: boxWidth };
+    // Outer rounded border on top of everything (subtle dark grey, thin line)
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#888888";
+    strokeOrFillRoundRect(boxLeft, boxTop, boxWidth, boxHeight, cornerRadius, false);
+
+    return {
+        left: boxLeft,
+        right: boxLeft + boxWidth,
+        top: boxTop,
+        bottom: boxTop + boxHeight,
+        width: boxWidth,
+        height: boxHeight,
+    };
 }
 
 function generateInstructionTitlePage(
@@ -1125,119 +1216,169 @@ function generateInstructionTitlePage(
     const legendGridWidth = legendSquareSide * platesPerRow;
     const legendGridHeight = legendSquareSide * platesPerCol;
     
-    // Calculate total height needed: title area + grid + gap + preview image + padding.
-    // The preview image is now sized to ~90% of pictureHeight (see drawImage below) to stay
-    // large even for low-resolution / single-plate mosaics, so reserve that much vertical room.
-    const titleAreaHeight = pictureHeight * 0.45;
-    const previewImageHeight = pictureHeight * 0.9;
-    const gapBetween = scalingFactor;
-    const totalContentHeight = titleAreaHeight + legendGridHeight + gapBetween + previewImageHeight + scalingFactor;
-    
-    // Make canvas tall enough for all content
-    canvas.height = Math.max(
-        pictureHeight * 1.5, 
-        pictureHeight * 0.4 + availableStudHexList.length * radius * 2.5,
-        totalContentHeight
-    );
+    // Estimate legend height up-front so the canvas reserves enough room for it.
+    // This mirrors the maths in drawStudCountForContext (rowHeight + paddings).
+    const MIN_LEGEND_FONT_LOCAL = 22;
+    const legendCountFontLocal = Math.max(scalingFactor / 2, MIN_LEGEND_FONT_LOCAL);
+    const legendEffectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT_LOCAL * 2);
+    const legendRowHeight = legendEffectiveScale * 1.3;
+    const legendHeaderHeight = legendCountFontLocal * 1.05 * 1.8;
+    const legendEstHeight =
+        legendHeaderHeight +
+        legendEffectiveScale * 0.4 +
+        legendRowHeight * availableStudHexList.length +
+        legendEffectiveScale * 0.6;
+
+    const titleFontSize = scalingFactor * 2;
+    const metaFontSize = Math.max(scalingFactor / 2, 22);
+    const titleHeight = titleFontSize * 1.4;
+    const metaLineGap = metaFontSize * 1.6;
+    const metaBlockHeight = metaLineGap * 4 + metaFontSize;
+    const titleToMetaGap = scalingFactor * 0.6;
+    const metaToGridGap = scalingFactor * 1.2;
+    const gridToPreviewGap = scalingFactor * 0.8;
+
+    // Preview image: target size before knowing the right-block width. We size it to a
+    // sensible fraction of pictureWidth (capped to pictureHeight) and re-fit later once
+    // the right-block width is known.
+    const srcAspect = finalImageCanvas.width / finalImageCanvas.height;
+    const previewMaxHeight = pictureHeight * 0.85;
+    let previewWidthInit = pictureWidth * 0.95;
+    let previewHeightInit = previewWidthInit / srcAspect;
+    if (previewHeightInit > previewMaxHeight) {
+        previewHeightInit = previewMaxHeight;
+        previewWidthInit = previewHeightInit * srcAspect;
+    }
+
+    const gridDrawn = numPlates > 1;
+    const gridHeight = gridDrawn ? legendGridHeight : 0;
+    const rightBlockHeight =
+        titleHeight +
+        titleToMetaGap +
+        metaBlockHeight +
+        (gridDrawn ? metaToGridGap + gridHeight : 0) +
+        gridToPreviewGap +
+        previewHeightInit;
+
+    // Canvas height must accommodate both columns + outer padding.
+    const outerPadding = scalingFactor * 1.5;
+    const requiredHeight = Math.max(legendEstHeight, rightBlockHeight) + outerPadding * 2;
+    canvas.height = Math.max(pictureHeight * 1.5, requiredHeight);
     canvas.width = pictureWidth * 2;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Draw the legend on the left, vertically centered on the canvas.
+    const legendTop = (canvas.height - legendEstHeight) / 2;
     const legendBox = drawStudCountForContext(
         studMap,
         availableStudHexList,
         scalingFactor,
         ctx,
         pictureWidth * 0.25,
-        pictureHeight * 0.2 - radius,
+        legendTop,
         pixelType
     );
 
-    // Variant B layout: legend stays on the left, everything else (title, metadata,
-    // plate grid, preview image) is centered horizontally as one block in the space
-    // remaining to the right of the legend.
+    // Right block: stacked title, metadata, optional plate grid, preview image.
+    // Centered horizontally in the space to the right of the legend, and centered
+    // vertically as one group within the canvas.
     const rightBlockLeft = legendBox.right + scalingFactor * 2;
-    const rightBlockRight = canvas.width - scalingFactor;
+    const rightBlockRight = canvas.width - outerPadding;
     const rightBlockCenterX = (rightBlockLeft + rightBlockRight) / 2;
     const rightBlockWidth = rightBlockRight - rightBlockLeft;
 
+    // Re-fit preview to the actual right-block width (it can be narrower than our
+    // initial estimate when the legend is unusually wide).
+    let previewWidth = Math.min(previewWidthInit, rightBlockWidth * 0.98);
+    let previewHeight = previewWidth / srcAspect;
+    if (previewHeight > previewMaxHeight) {
+        previewHeight = previewMaxHeight;
+        previewWidth = previewHeight * srcAspect;
+    }
+    const finalRightBlockHeight =
+        titleHeight +
+        titleToMetaGap +
+        metaBlockHeight +
+        (gridDrawn ? metaToGridGap + gridHeight : 0) +
+        gridToPreviewGap +
+        previewHeight;
+    let cursorY = (canvas.height - finalRightBlockHeight) / 2;
+
+    // Title
     ctx.fillStyle = "#000000";
     ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.font = `${titleFontSize}px Arial`;
+    ctx.fillText(t('pdfLegoMosaic'), rightBlockCenterX, cursorY + titleFontSize);
+    cursorY += titleHeight + titleToMetaGap;
 
-    ctx.font = `${scalingFactor * 2}px Arial`;
-    ctx.fillText(t('pdfLegoMosaic'), rightBlockCenterX, pictureHeight * 0.28);
-    ctx.font = `${scalingFactor / 2}px Arial`;
+    // Metadata block
+    ctx.font = `${metaFontSize}px Arial`;
+    let metaY = cursorY + metaFontSize;
     ctx.fillText(
         `${t('pdfResolution')}: ${width} x ${pixelArray.length / (4 * width)}`,
         rightBlockCenterX,
-        pictureHeight * 0.34
+        metaY
     );
+    metaY += metaLineGap;
     ctx.fillText(
         `${t('pdfPlates')}: ${platesPerRow} x ${platesPerCol} (${numPlates} ${t('pdfTotal')})`,
         rightBlockCenterX,
-        pictureHeight * 0.38
+        metaY
     );
+    metaY += metaLineGap;
     ctx.fillText(
         `${t('pdfPlateSize')}: ${plateWidth} x ${plateHeight}`,
         rightBlockCenterX,
-        pictureHeight * 0.42
+        metaY
     );
+    metaY += metaLineGap;
     const height = pixelArray.length / (4 * width);
     const widthCm = (width * pixelWidthCm).toFixed(1);
     const heightCm = (height * pixelWidthCm).toFixed(1);
     ctx.fillText(
         `${t('pdfSize')}: ${widthCm} x ${heightCm} cm`,
         rightBlockCenterX,
-        pictureHeight * 0.46
+        metaY
     );
+    cursorY += metaBlockHeight;
 
     // Reset text alignment so downstream text drawing is unaffected
     ctx.textAlign = "start";
 
-    // Draw the numbered plate grid — but only when there's more than one plate. A
-    // 1x1 grid is just a tiny "1" box that adds no information and clutters the page.
-    let gridDrawnHeight = 0;
-    const gridTopY = pictureHeight * 0.52;
-    if (numPlates > 1) {
+    // Plate grid (only when >1 plate) — centered on the right-block axis
+    if (gridDrawn) {
+        cursorY += metaToGridGap;
         const gridLeftX = rightBlockCenterX - (legendGridWidth / 2);
         ctx.lineWidth = 5;
         ctx.strokeStyle = "#000000";
+        ctx.fillStyle = "#000000";
         ctx.font = `${legendSquareSide / 2}px Arial`;
-
         for (var i = 0; i < numPlates; i++) {
             const horIndex = ((i * plateWidth) % width) / plateWidth;
             const vertIndex = Math.floor((i * plateWidth) / width);
             ctx.beginPath();
             ctx.rect(
                 gridLeftX + horIndex * legendSquareSide,
-                gridTopY + vertIndex * legendSquareSide,
+                cursorY + vertIndex * legendSquareSide,
                 legendSquareSide,
                 legendSquareSide
             );
             ctx.fillText(
                 i + 1,
                 gridLeftX + (horIndex + 0.18) * legendSquareSide,
-                gridTopY + (vertIndex + 0.65) * legendSquareSide
+                cursorY + (vertIndex + 0.65) * legendSquareSide
             );
             ctx.stroke();
         }
-        gridDrawnHeight = legendGridHeight + gapBetween;
+        cursorY += gridHeight;
     }
 
-    // Draw the preview image, centered horizontally on the right-block axis.
-    // Sized to fit within the right block width and ~90% of pictureHeight, with the
-    // source aspect ratio preserved so it stays large even for single-plate mosaics.
-    const previewMaxWidth = rightBlockWidth * 0.95;
-    const previewMaxHeight = pictureHeight * 0.9;
-    const srcAspect = finalImageCanvas.width / finalImageCanvas.height;
-    let previewWidth = previewMaxWidth;
-    let previewHeight = previewWidth / srcAspect;
-    if (previewHeight > previewMaxHeight) {
-        previewHeight = previewMaxHeight;
-        previewWidth = previewHeight * srcAspect;
-    }
+    // Preview image, centered horizontally on the right-block axis
+    cursorY += gridToPreviewGap;
     const previewHorizontalOffset = rightBlockCenterX - previewWidth / 2;
-    const previewVerticalOffset = gridTopY + gridDrawnHeight;
+    const previewVerticalOffset = cursorY;
     ctx.drawImage(
         finalImageCanvas,
         0,
@@ -1271,7 +1412,21 @@ function generateInstructionPage(
 
     const studMap = getUsedPixelsStudMap(pixelArray);
 
-    canvas.height = Math.max(pictureHeight * 1.5, pictureHeight * 0.4 + availableStudHexList.length * radius * 2.5);
+    // Match the legend's minimum-size logic so the canvas reserves enough room
+    // for the readable legend at high resolutions (small scalingFactor).
+    const PAGE_MIN_LEGEND_FONT = 22;
+    const pageLegendScale = Math.max(scalingFactor, PAGE_MIN_LEGEND_FONT * 2);
+    const pageLegendRowHeight = pageLegendScale * 1.3;
+    const pageLegendHeight =
+        PAGE_MIN_LEGEND_FONT * 1.05 * 1.8 +
+        pageLegendScale * 0.4 +
+        pageLegendRowHeight * availableStudHexList.length +
+        pageLegendScale * 0.6;
+    canvas.height = Math.max(
+        pictureHeight * 1.5,
+        pictureHeight * 0.4 + availableStudHexList.length * radius * 2.5,
+        pageLegendHeight + scalingFactor * 2
+    );
     canvas.width = pictureWidth * 2;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
