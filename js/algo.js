@@ -1,47 +1,11 @@
 // Preload BRICKONAS logo for the PDF title page. Loaded eagerly so it's almost
 // always ready by the time the user reaches step 3; if it isn't, the title page
 // falls back to text rendering.
-//
-// We also build a "cleaned" version on a hidden canvas: any pixel that isn't a
-// solid green (the logo's background colour) is replaced with pure white. The
-// source PNG has slightly off-white edges that look grey on the page, so this
-// gives us a perfectly white background while preserving the green BRICKONAS
-// pill in the centre.
 const BRICKONAS_LOGO = (function () {
     const img = new Image();
     img.src = "assets/brickonas-logo.png";
     return img;
 })();
-let BRICKONAS_LOGO_CLEAN = null;
-function getCleanedBrickonasLogo() {
-    if (BRICKONAS_LOGO_CLEAN) return BRICKONAS_LOGO_CLEAN;
-    if (!BRICKONAS_LOGO.complete || !BRICKONAS_LOGO.naturalWidth) return null;
-    const c = document.createElement("canvas");
-    c.width = BRICKONAS_LOGO.naturalWidth;
-    c.height = BRICKONAS_LOGO.naturalHeight;
-    const cctx = c.getContext("2d");
-    cctx.drawImage(BRICKONAS_LOGO, 0, 0);
-    try {
-        const img = cctx.getImageData(0, 0, c.width, c.height);
-        const d = img.data;
-        for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i + 1], b = d[i + 2];
-            // Detect "logo green": green channel dominant, others much lower.
-            const isGreen = g > 60 && g > r * 1.4 && g > b * 1.4;
-            // Detect white text inside the green pill (preserve as white).
-            const isWhiteText = r > 200 && g > 200 && b > 200;
-            if (!isGreen && !isWhiteText) {
-                d[i] = 255; d[i + 1] = 255; d[i + 2] = 255; d[i + 3] = 255;
-            }
-        }
-        cctx.putImageData(img, 0, 0);
-        BRICKONAS_LOGO_CLEAN = c;
-        return c;
-    } catch (e) {
-        // Tainted canvas (CORS) — fall back to the original asset
-        return null;
-    }
-}
 
 function hexToRgb(hex) {
     const hexInt = parseInt(hex.replace("#", ""), 16);
@@ -1318,15 +1282,11 @@ function generateInstructionTitlePage(
     const gridCardHeight = gridDrawn ? gridCardInnerHeight + gridCardPadV * 1.2 : 0;
     const gridCardWidth = gridDrawn ? legendGridWidth + gridCardPadH * 2 : 0;
 
-    // Top band layout:
-    //   - Logo: anchored to the top-right corner of the right block (separate).
-    //   - Info group (BrickPic subtitle + meta card + plate-arrangement card):
-    //     fills the space from rightBlockLeft up to the logo's left edge,
-    //     centered horizontally in that available space.
-    const infoRowHeight = Math.max(metaBlockHeight, gridCardHeight);
-    const infoGroupHeight = subTitleHeight + infoRowHeight;
-    const topBandHeight = Math.max(infoGroupHeight, logoTargetHeight);
-    const rightBlockHeight = topBandHeight + infoToPreviewGap + previewHeightInit;
+    // Top group = info row (meta card + optional grid card + logo) on one line,
+    // with the BrickPic subtitle floating just above the cards.
+    const topRowVisualHeight = Math.max(metaBlockHeight, gridCardHeight, logoTargetHeight);
+    const topGroupHeight = subTitleHeight + topRowVisualHeight;
+    const rightBlockHeight = topGroupHeight + infoToPreviewGap + previewHeightInit;
 
     const outerPadding = scalingFactor * 1.5;
     const requiredHeight = Math.max(legendEstHeight, rightBlockHeight) + outerPadding * 2;
@@ -1385,60 +1345,50 @@ function generateInstructionTitlePage(
     const colSeparatorGap = metaFontSize * 1.2;
     const metaCardWidth = metaCardPadH * 2 + maxLabelW + colSeparatorGap + maxValueW;
 
-    // ---- Logo: anchored to the top-right of the right block ----
-    // Cap logo width to a reasonable share of the right block.
-    const logoMaxWidth = rightBlockWidth * 0.35;
-    if (logoTargetWidth > logoMaxWidth) {
-        const k = logoMaxWidth / logoTargetWidth;
-        logoTargetWidth = logoTargetWidth * k;
+    // ---- Compose top row as a single centered group: meta card + grid card + logo ----
+    // Total width of the row, then center it in the right block. If too wide, scale
+    // the logo down (it has the most flexibility).
+    const logoToInfoGap = scalingFactor * 1.5;
+    let topRowTotalWidth =
+        metaCardWidth +
+        (gridDrawn ? infoCardGap + gridCardWidth : 0) +
+        logoToInfoGap +
+        logoTargetWidth;
+
+    if (topRowTotalWidth > rightBlockWidth) {
+        const overflow = topRowTotalWidth - rightBlockWidth;
+        const newLogoWidth = Math.max(logoTargetWidth - overflow, 80);
+        const k = newLogoWidth / logoTargetWidth;
+        logoTargetWidth = newLogoWidth;
         logoTargetHeight = logoTargetHeight * k;
+        topRowTotalWidth =
+            metaCardWidth +
+            (gridDrawn ? infoCardGap + gridCardWidth : 0) +
+            logoToInfoGap +
+            logoTargetWidth;
     }
 
-    // Compute final top-band geometry
-    const finalTopBandHeight = Math.max(infoGroupHeight, logoTargetHeight);
-    const finalRightBlockHeight = finalTopBandHeight + infoToPreviewGap + previewHeight;
+    // Re-compute top-row height now that the logo may have shrunk
+    const finalTopRowHeight = Math.max(metaBlockHeight, gridCardHeight, logoTargetHeight);
+    const finalTopGroupHeight = subTitleHeight + finalTopRowHeight;
+    const finalRightBlockHeight = finalTopGroupHeight + infoToPreviewGap + previewHeight;
     const rightBlockTop = (canvas.height - finalRightBlockHeight) / 2;
 
-    // Logo position: top-right corner, vertically centered in the top band
-    const logoX = rightBlockRight - logoTargetWidth;
-    const logoY = rightBlockTop + (finalTopBandHeight - logoTargetHeight) / 2;
+    // Group is centered horizontally within the right block
+    const topRowLeft = rightBlockLeft + (rightBlockWidth - topRowTotalWidth) / 2;
+    const topRowTop = rightBlockTop + subTitleHeight;
 
-    // Info group: fills the space left of the logo, centered horizontally in
-    // that gap. The info group consists of (meta card + optional plate grid)
-    // and a BrickPic subtitle just above them.
-    const logoToInfoGap = scalingFactor * 1.5;
-    const infoSpaceLeft = rightBlockLeft;
-    const infoSpaceRight = logoX - logoToInfoGap;
-    const infoSpaceWidth = infoSpaceRight - infoSpaceLeft;
-    const infoRowTotalWidth = metaCardWidth + (gridDrawn ? infoCardGap + gridCardWidth : 0);
-    const infoRowLeft = infoSpaceLeft + Math.max(0, (infoSpaceWidth - infoRowTotalWidth) / 2);
-    const infoGroupTop = rightBlockTop + (finalTopBandHeight - infoGroupHeight) / 2;
-    const infoRowTop = infoGroupTop + subTitleHeight;
-    const infoRowVisualHeight = infoRowHeight;
-
-    // "BrickPic" subtitle, left-aligned with the info row
+    // ---- "BrickPic" subtitle above the info row, left-aligned with the row ----
     ctx.fillStyle = subTitleColor;
     ctx.font = `bold italic ${subTitleFontSize}px Georgia, "Times New Roman", serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText("BrickPic", infoRowLeft, infoGroupTop + subTitleFontSize * 1.05);
+    ctx.fillText("BrickPic", topRowLeft, rightBlockTop + subTitleFontSize * 1.05);
 
-    // Draw logo with white background and cleaned-up edges
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(logoX, logoY, logoTargetWidth, logoTargetHeight);
-    const cleaned = getCleanedBrickonasLogo();
-    if (cleaned) {
-        ctx.drawImage(cleaned, logoX, logoY, logoTargetWidth, logoTargetHeight);
-    } else if (logoLoaded) {
-        ctx.drawImage(BRICKONAS_LOGO, logoX, logoY, logoTargetWidth, logoTargetHeight);
-    } else {
-        ctx.fillStyle = "#1B5E20";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "alphabetic";
-        ctx.font = `bold ${titleFontSize * 1.6}px Arial`;
-        ctx.fillText("BRICKONAS", logoX, logoY + titleFontSize * 1.6);
-        ctx.textAlign = "start";
-    }
+    // ---- Info row content positioning ----
+    const infoRowLeft = topRowLeft;
+    const infoRowTop = topRowTop;
+    const infoRowVisualHeight = finalTopRowHeight;
 
     // Metadata card
     const metaCardLeft = infoRowLeft;
@@ -1531,10 +1481,32 @@ function generateInstructionTitlePage(
         ctx.textBaseline = "alphabetic";
     }
 
-    // ---- Preview image: below the top band, centered on the right-block axis ----
+    // ---- Logo: rightmost in the top row, with white background ----
+    const logoX =
+        infoRowLeft +
+        metaCardWidth +
+        (gridDrawn ? infoCardGap + gridCardWidth : 0) +
+        logoToInfoGap;
+    const logoY = infoRowTop + (infoRowVisualHeight - logoTargetHeight) / 2;
+    // Paint a clean white background behind the logo so any transparency or
+    // off-white pixels in the asset don't show against the page.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(logoX, logoY, logoTargetWidth, logoTargetHeight);
+    if (logoLoaded) {
+        ctx.drawImage(BRICKONAS_LOGO, logoX, logoY, logoTargetWidth, logoTargetHeight);
+    } else {
+        ctx.fillStyle = "#1B5E20";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.font = `bold ${titleFontSize * 1.6}px Arial`;
+        ctx.fillText("BRICKONAS", logoX, logoY + titleFontSize * 1.6);
+        ctx.textAlign = "start";
+    }
+
+    // ---- Preview image: below the top group, centered on the right-block axis ----
     const rightBlockCenterX = (rightBlockLeft + rightBlockRight) / 2;
     const previewHorizontalOffset = rightBlockCenterX - previewWidth / 2;
-    const previewVerticalOffset = rightBlockTop + finalTopBandHeight + infoToPreviewGap;
+    const previewVerticalOffset = rightBlockTop + finalTopGroupHeight + infoToPreviewGap;
     ctx.drawImage(
         finalImageCanvas,
         0,
