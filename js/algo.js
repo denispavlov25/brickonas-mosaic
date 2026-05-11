@@ -1033,6 +1033,21 @@ function getSubPixelArray(pixelArray, index, width, plateWidth) {
     return result;
 }
 
+// Extract a smaller rectangular sub-block from a flat RGBA plate array.
+// Used to split a plate (e.g. 48×48) into readable detail blocks (e.g. 16×16).
+function getSubBlockFromPlate(plateArray, plateWidth, blockCol, blockRow, blockWidth) {
+    const result = [];
+    const startX = blockCol * blockWidth;
+    const startY = blockRow * blockWidth;
+    for (let y = startY; y < startY + blockWidth; y++) {
+        for (let x = startX; x < startX + blockWidth; x++) {
+            const idx = (y * plateWidth + x) * 4;
+            result.push(plateArray[idx], plateArray[idx + 1], plateArray[idx + 2], plateArray[idx + 3]);
+        }
+    }
+    return result;
+}
+
 function drawStudCountForContext(
     studMap,
     availableStudHexList,

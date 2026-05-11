@@ -2590,36 +2590,73 @@ async function _generateBlobFromStep4() {
     // Each plate page is only 16x16 studs, so canvas is 16*40=640px max — safe on mobile.
     // This ensures plate pages are sharp even for large mosaics where global SCALING_FACTOR drops.
     const PRINT_SCALING = 40;
+    // Detail-block size: split each plate into BLOCK_SIZE × BLOCK_SIZE sub-pages
+    // so each readable build step matches one 16×16 stud area (≈ one mini-baseplate).
+    // Only applied when the plate is a multiple of BLOCK_SIZE; otherwise we keep
+    // a single plate page (small plates like 16×16 are already readable).
+    const BLOCK_SIZE = 16;
+    const helper = drawPdfInstructionPage;
     for (var i = 0; i < totalPlates; i++) {
         await sleep(10);
         pdf.addPage();
-        const instructionPageCanvas = document.createElement("canvas");
         const subPixelArray = getSubPixelArray(resultImage, i, targetResolution[0], PLATE_WIDTH);
         const row = Math.floor((i * PLATE_WIDTH) / targetResolution[0]);
         const col = i % (targetResolution[0] / PLATE_WIDTH);
         const variablePixelPieceDimensionsForPage = step3VariablePixelPieceDimensions == null
             ? null
             : getSubPixelMatrix(step3VariablePixelPieceDimensions, col * PLATE_WIDTH, row * PLATE_WIDTH, PLATE_WIDTH, PLATE_WIDTH);
-        generateInstructionPage(subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, PRINT_SCALING,
-            instructionPageCanvas, i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage);
-        setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
-        const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
-        // Fit instruction page into the PDF page, preserving aspect ratio + center it
-        const pageImgRatio = instructionPageCanvas.width / instructionPageCanvas.height;
-        let drawW = pdfWidth;
-        let drawH = pdfWidth / pageImgRatio;
-        if (drawH > pdfHeight) {
-            drawH = pdfHeight;
-            drawW = pdfHeight * pageImgRatio;
+
+        // Plate overview page (full PLATE_WIDTH × PLATE_WIDTH) — keeps customer orientation.
+        await helper(pdf, subPixelArray, PLATE_WIDTH, filteredAvailableStudHexList, PRINT_SCALING,
+            i + 1, selectedPixelPartNumber, variablePixelPieceDimensionsForPage,
+            pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES);
+
+        // Detail sub-pages: split the plate into BLOCK_SIZE × BLOCK_SIZE blocks.
+        const blocksPerSide = PLATE_WIDTH / BLOCK_SIZE;
+        if (blocksPerSide > 1 && Number.isInteger(blocksPerSide)) {
+            let blockIdx = 0;
+            for (let br = 0; br < blocksPerSide; br++) {
+                for (let bc = 0; bc < blocksPerSide; bc++) {
+                    blockIdx++;
+                    await sleep(10);
+                    pdf.addPage();
+                    const blockArray = getSubBlockFromPlate(subPixelArray, PLATE_WIDTH, bc, br, BLOCK_SIZE);
+                    const blockVariableDims = variablePixelPieceDimensionsForPage == null
+                        ? null
+                        : getSubPixelMatrix(variablePixelPieceDimensionsForPage, bc * BLOCK_SIZE, br * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    const blockLabel = `${i + 1}.${blockIdx}`;
+                    await helper(pdf, blockArray, BLOCK_SIZE, filteredAvailableStudHexList, PRINT_SCALING,
+                        blockLabel, selectedPixelPartNumber, blockVariableDims,
+                        pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES);
+                }
+            }
         }
-        const drawX = (pdfWidth - drawW) / 2;
-        const drawY = (pdfHeight - drawH) / 2;
-        pdf.addImage(pageImgData, "JPEG", drawX, drawY, drawW, drawH);
-        instructionPageCanvas.width = 0;
-        instructionPageCanvas.height = 0;
     }
     addWaterMark(pdf, isHighQuality);
     return pdf.output("blob");
+}
+
+// Render one instruction page (plate overview or detail block) into the PDF.
+async function drawPdfInstructionPage(pdf, pixelArray, plateWidth, availableStudHexList, scaling,
+                                       label, pixelType, variableDims,
+                                       pdfWidth, pdfHeight, isHighQuality, jpegQuality) {
+    const canvas = document.createElement("canvas");
+    generateInstructionPage(pixelArray, plateWidth, availableStudHexList, scaling,
+        canvas, label, pixelType, variableDims);
+    setDPI(canvas, isHighQuality ? HIGH_DPI : LOW_DPI);
+    const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
+    const ratio = canvas.width / canvas.height;
+    let drawW = pdfWidth;
+    let drawH = pdfWidth / ratio;
+    if (drawH > pdfHeight) {
+        drawH = pdfHeight;
+        drawW = pdfHeight * ratio;
+    }
+    const drawX = (pdfWidth - drawW) / 2;
+    const drawY = (pdfHeight - drawH) / 2;
+    pdf.addImage(imgData, "JPEG", drawX, drawY, drawW, drawH);
+    canvas.width = 0;
+    canvas.height = 0;
 }
 
 // Upload PDF blob to WordPress, returns token on success, or null on failure.
