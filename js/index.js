@@ -2756,12 +2756,90 @@ async function generateInstructions() {
         // Remove title page canvas from DOM to free memory
         titlePageCanvas.remove();
 
-        let numParts = 1;
+        // Render one page (plate overview or 16x16 detail) into the current pdf.
+        // Returns nothing; mutates pdf via addImage.
+        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims) => {
+            const instructionPageCanvas = document.createElement("canvas");
+            generateInstructionPage(
+                pixelArrayForPage,
+                plateWidthForPage,
+                filteredAvailableStudHexList,
+                SCALING_FACTOR,
+                instructionPageCanvas,
+                label,
+                selectedPixelPartNumber,
+                variableDims
+            );
+            setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
+            const pageImgData = instructionPageCanvas.toDataURL("image/png", 1.0);
+            pdf.addImage(
+                pageImgData,
+                "PNG",
+                0,
+                0,
+                pdfWidth,
+                (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width
+            );
+            instructionPageCanvas.width = 0;
+            instructionPageCanvas.height = 0;
+        };
+
+        // Detail-block size: split each plate into BLOCK_SIZE × BLOCK_SIZE sub-pages
+        // so each readable build step matches one 16×16 stud area. Only when the
+        // plate is a clean multiple of BLOCK_SIZE (small plates stay single-page).
+        const BLOCK_SIZE = 16;
+
+        // Build a flat list of pages so the multi-part splitter (every N pages)
+        // works the same way as before, regardless of how many sub-pages we add.
+        const pageJobs = [];
         for (var i = 0; i < totalPlates; i++) {
-            // Yield to browser to prevent UI freeze and allow garbage collection
+            const subPixelArray = getSubPixelArray(resultImage, i, targetResolution[0], PLATE_WIDTH);
+            const row = Math.floor((i * PLATE_WIDTH) / targetResolution[0]);
+            const col = i % (targetResolution[0] / PLATE_WIDTH);
+            const variablePixelPieceDimensionsForPage =
+                step3VariablePixelPieceDimensions == null
+                    ? null
+                    : getSubPixelMatrix(
+                          step3VariablePixelPieceDimensions,
+                          col * PLATE_WIDTH,
+                          row * PLATE_WIDTH,
+                          PLATE_WIDTH,
+                          PLATE_WIDTH
+                      );
+            // Plate overview
+            pageJobs.push({
+                pixels: subPixelArray,
+                width: PLATE_WIDTH,
+                label: i + 1,
+                variableDims: variablePixelPieceDimensionsForPage,
+            });
+            // Detail sub-pages (only if plate cleanly divides into 16×16 blocks)
+            const blocksPerSide = PLATE_WIDTH / BLOCK_SIZE;
+            if (blocksPerSide > 1 && Number.isInteger(blocksPerSide)) {
+                let blockIdx = 0;
+                for (let br = 0; br < blocksPerSide; br++) {
+                    for (let bc = 0; bc < blocksPerSide; bc++) {
+                        blockIdx++;
+                        const blockArray = getSubBlockFromPlate(subPixelArray, PLATE_WIDTH, bc, br, BLOCK_SIZE);
+                        const blockVariableDims = variablePixelPieceDimensionsForPage == null
+                            ? null
+                            : getSubPixelMatrix(variablePixelPieceDimensionsForPage, bc * BLOCK_SIZE, br * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                        pageJobs.push({
+                            pixels: blockArray,
+                            width: BLOCK_SIZE,
+                            label: `${i + 1}.${blockIdx}`,
+                            variableDims: blockVariableDims,
+                        });
+                    }
+                }
+            }
+        }
+
+        let numParts = 1;
+        for (var p = 0; p < pageJobs.length; p++) {
             await sleep(10);
-            
-            if ((i + 1) % (isHighQuality ? 20 : 50) === 0) {
+
+            if ((p + 1) % (isHighQuality ? 20 : 50) === 0) {
                 addWaterMark(pdf, isHighQuality);
                 pdf.save(`${t('pdfFilename')}-${t('pdfInstructions')}-${t('pdfPart')}-${numParts}.pdf`);
                 numParts++;
@@ -2774,54 +2852,10 @@ async function generateInstructions() {
                 pdf.addPage();
             }
 
-            document.getElementById("pdf-progress-bar").style.width = `${((i + 2) * 100) / (totalPlates + 1)}%`;
+            document.getElementById("pdf-progress-bar").style.width = `${((p + 2) * 100) / (pageJobs.length + 1)}%`;
 
-            const instructionPageCanvas = document.createElement("canvas");
-            // Don't append to DOM - just use it for rendering
-            
-            const subPixelArray = getSubPixelArray(resultImage, i, targetResolution[0], PLATE_WIDTH);
-
-            const row = Math.floor((i * PLATE_WIDTH) / targetResolution[0]);
-            const col = i % (targetResolution[0] / PLATE_WIDTH);
-
-            const variablePixelPieceDimensionsForPage =
-                step3VariablePixelPieceDimensions == null
-                    ? null
-                    : getSubPixelMatrix(
-                          step3VariablePixelPieceDimensions,
-                          col * PLATE_WIDTH,
-                          row * PLATE_WIDTH,
-                          PLATE_WIDTH,
-                          PLATE_WIDTH
-                      );
-            generateInstructionPage(
-                subPixelArray,
-                PLATE_WIDTH,
-                filteredAvailableStudHexList,
-                SCALING_FACTOR,
-                instructionPageCanvas,
-                i + 1,
-                selectedPixelPartNumber,
-                variablePixelPieceDimensionsForPage
-            );
-
-            setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
-            
-            // Use correct MIME type for image conversion
-            const pageImgData = instructionPageCanvas.toDataURL("image/png", 1.0);
-
-            pdf.addImage(
-                pageImgData,
-                "PNG",
-                0,
-                0,
-                pdfWidth,
-                (pdfWidth * instructionPageCanvas.height) / instructionPageCanvas.width
-            );
-            
-            // Clear canvas to free memory
-            instructionPageCanvas.width = 0;
-            instructionPageCanvas.height = 0;
+            const job = pageJobs[p];
+            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims);
         }
 
         addWaterMark(pdf, isHighQuality);
