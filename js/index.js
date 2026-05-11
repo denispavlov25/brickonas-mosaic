@@ -2636,9 +2636,10 @@ async function _generateBlobFromStep4() {
                     // (otherwise jsPDF stretches the smaller canvas across the same
                     // page and the studs end up looking 3× too big).
                     const detailScaling = PRINT_SCALING * (PLATE_WIDTH / BLOCK_SIZE);
+                    // But keep the legend at the plate scale so it doesn't grow 3×.
                     await helper(pdf, blockArray, BLOCK_SIZE, filteredAvailableStudHexList, detailScaling,
                         blockLabel, selectedPixelPartNumber, blockVariableDims,
-                        pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES, overviewContext);
+                        pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES, overviewContext, PRINT_SCALING);
                 }
             }
         }
@@ -2650,10 +2651,10 @@ async function _generateBlobFromStep4() {
 // Render one instruction page (plate overview or detail block) into the PDF.
 async function drawPdfInstructionPage(pdf, pixelArray, plateWidth, availableStudHexList, scaling,
                                        label, pixelType, variableDims,
-                                       pdfWidth, pdfHeight, isHighQuality, jpegQuality, overviewContext) {
+                                       pdfWidth, pdfHeight, isHighQuality, jpegQuality, overviewContext, legendScalingOverride) {
     const canvas = document.createElement("canvas");
     generateInstructionPage(pixelArray, plateWidth, availableStudHexList, scaling,
-        canvas, label, pixelType, variableDims, overviewContext);
+        canvas, label, pixelType, variableDims, overviewContext, legendScalingOverride);
     setDPI(canvas, isHighQuality ? HIGH_DPI : LOW_DPI);
     const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
     const ratio = canvas.width / canvas.height;
@@ -2779,7 +2780,7 @@ async function generateInstructions() {
         // Render one page (plate overview or 16x16 detail) into the current pdf.
         // overviewContext (optional): { fullPlateArray, plateWidth, blockCol, blockRow, blockSize }
         // triggers a small thumbnail with the current block highlighted.
-        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims, overviewContext, scalingOverride) => {
+        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims, overviewContext, scalingOverride, legendScalingOverride) => {
             const instructionPageCanvas = document.createElement("canvas");
             generateInstructionPage(
                 pixelArrayForPage,
@@ -2790,7 +2791,8 @@ async function generateInstructions() {
                 label,
                 selectedPixelPartNumber,
                 variableDims,
-                overviewContext
+                overviewContext,
+                legendScalingOverride
             );
             setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
             const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
@@ -2853,6 +2855,8 @@ async function generateInstructions() {
                             variableDims: blockVariableDims,
                             // Match plate canvas size: detail block × 3 ≈ plate × 1 (at 48/16)
                             scalingOverride: SCALING_FACTOR * (PLATE_WIDTH / BLOCK_SIZE),
+                            // Keep the legend at the plate scale (smaller) instead of growing 3×.
+                            legendScalingOverride: SCALING_FACTOR,
                             overviewContext: {
                                 fullPlateArray: subPixelArray,
                                 plateWidth: PLATE_WIDTH,
@@ -2886,7 +2890,7 @@ async function generateInstructions() {
             document.getElementById("pdf-progress-bar").style.width = `${((p + 2) * 100) / (pageJobs.length + 1)}%`;
 
             const job = pageJobs[p];
-            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims, job.overviewContext, job.scalingOverride);
+            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims, job.overviewContext, job.scalingOverride, job.legendScalingOverride);
         }
 
         addWaterMark(pdf, isHighQuality);

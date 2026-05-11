@@ -1545,8 +1545,13 @@ function generateInstructionPage(
     plateNumber,
     pixelType,
     variablePixelPieceDimensions,
-    overviewContext
+    overviewContext,
+    legendScalingOverride
 ) {
+    // On detail pages the picture scalingFactor is multiplied to match the
+    // plate-page canvas size — but we don't want the legend to grow with it.
+    // Callers can pass legendScalingOverride to keep the legend at the plate scale.
+    const legendScale = legendScalingOverride || scalingFactor;
     const ctx = canvas.getContext("2d");
 
     pictureWidth = plateWidth * scalingFactor;
@@ -1564,8 +1569,9 @@ function generateInstructionPage(
 
     // Match the legend's minimum-size logic so the canvas reserves enough room
     // for the readable legend at high resolutions (small scalingFactor).
+    // Use legendScale (not scalingFactor) so detail pages don't blow up the legend.
     const PAGE_MIN_LEGEND_FONT = 26;
-    const pageLegendScale = Math.max(scalingFactor, PAGE_MIN_LEGEND_FONT * 2);
+    const pageLegendScale = Math.max(legendScale, PAGE_MIN_LEGEND_FONT * 2);
     const pageLegendRowHeight = pageLegendScale * 1.3;
     const pageLegendHeight =
         PAGE_MIN_LEGEND_FONT * 1.05 * 1.8 +
@@ -1662,11 +1668,12 @@ function generateInstructionPage(
     // Helps the customer see where this 16×16 detail belongs in the plate.
     // Placed to the right of the main picture, in the right gutter.
     if (overviewContext) {
-        const gutterX = pictureWidth * 1.75 + scalingFactor * 0.4;
-        const availW = canvas.width - gutterX - scalingFactor * 0.4;
-        // Larger thumbnail than before — fills most of the right gutter.
-        const thumbSize = Math.max(200, Math.min(availW, pictureHeight * 0.8));
-        drawPlateOverviewThumbnail(ctx, overviewContext, pixelType, {
+        const gutterX = pictureWidth * 1.75 + legendScale * 0.6;
+        const availW = canvas.width - gutterX - legendScale * 0.4;
+        // Use as much of the right gutter as possible — capped to the picture
+        // height so it doesn't overflow the page.
+        const thumbSize = Math.min(availW, pictureHeight * 0.95);
+        drawPlateOverviewThumbnail(ctx, overviewContext, pixelType, legendScale, {
             x: gutterX,
             y: pictureHeight * 0.2,
             size: thumbSize,
@@ -1676,7 +1683,7 @@ function generateInstructionPage(
     drawStudCountForContext(
         studMap,
         visibleStudHexList,
-        scalingFactor,
+        legendScale,
         ctx,
         pictureWidth * 0.25,
         pictureHeight * 0.2 - radius,
@@ -1688,19 +1695,20 @@ function generateInstructionPage(
 // Draws a small thumbnail of the full plate with the current sub-block
 // outlined in green. The plate's pixels are rendered as flat colored squares
 // (no stud rendering, no numbers) — the goal is "where am I", not legibility.
-function drawPlateOverviewThumbnail(ctx, overview, pixelType, layout) {
+function drawPlateOverviewThumbnail(ctx, overview, pixelType, legendScale, layout) {
     const { fullPlateArray, plateWidth, blockCol, blockRow, blockSize } = overview;
     const { x, y, size } = layout;
 
     const cell = size / plateWidth;
 
-    // Title above the thumbnail
-    const titleFont = Math.max(14, size * 0.04);
+    // Title above the thumbnail — sized like the legend so it stays readable
+    // but doesn't dominate the page when the picture canvas is large.
+    const titleFont = Math.max(20, legendScale * 0.7);
     ctx.fillStyle = "#202020";
     ctx.font = `bold ${titleFont}px Arial`;
     ctx.textAlign = "start";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText(t('pdfOverviewLabel') || "Übersicht", x, y - titleFont * 0.6);
+    ctx.fillText(t('pdfOverviewLabel'), x, y - titleFont * 0.4);
 
     // Pixel grid
     for (let i = 0; i < plateWidth; i++) {
