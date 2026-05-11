@@ -1063,9 +1063,7 @@ function drawStudCountForContext(
     // Use a minimum font size so the legend stays readable at high resolutions
     // (e.g. 288x288 mosaics where scalingFactor is small). The legend's geometry
     // is then driven by `effectiveScale`, decoupling it from the picture grid.
-    // Lowered from 26→16 — at the prior floor the legend ate ~45% of the page
-    // on detail blocks, which made the picture and overview feel cramped.
-    const MIN_LEGEND_FONT = 16;
+    const MIN_LEGEND_FONT = 20;
     const countFontSize = Math.max(scalingFactor / 2, MIN_LEGEND_FONT);
     const nameFontSize = Math.max(scalingFactor / 2.5, MIN_LEGEND_FONT * 0.85);
     const effectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT * 2);
@@ -1573,7 +1571,7 @@ function generateInstructionPage(
     // for the readable legend at high resolutions (small scalingFactor).
     // Use legendScale (not scalingFactor) so detail pages don't blow up the legend.
     // Keep this in sync with MIN_LEGEND_FONT in drawStudCountForContext.
-    const PAGE_MIN_LEGEND_FONT = 16;
+    const PAGE_MIN_LEGEND_FONT = 20;
     const pageLegendScale = Math.max(legendScale, PAGE_MIN_LEGEND_FONT * 2);
     const pageLegendRowHeight = pageLegendScale * 1.3;
     const pageLegendHeight =
@@ -1588,7 +1586,7 @@ function generateInstructionPage(
     );
     // Detail pages need a wider right gutter for a properly sized overview thumbnail.
     // Plate pages keep the original 2× layout.
-    canvas.width = overviewContext ? pictureWidth * 2.4 : pictureWidth * 2;
+    canvas.width = overviewContext ? pictureWidth * 2.15 : pictureWidth * 2;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
