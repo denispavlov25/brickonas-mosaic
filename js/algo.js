@@ -1737,6 +1737,11 @@ function drawPlateOverviewThumbnail(ctx, overview, pixelType, legendScale, layou
         blockSize * cell,
         blockSize * cell
     );
+
+    // Reset stroke state so later drawing (e.g. the legend swatches) doesn't
+    // inherit the thick green border from the block highlight.
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 1;
 }
 
 function getDepthSubPixelMatrix(pixelArray, totalWidth, horizontalOffset, verticalOffset, width, height) {
