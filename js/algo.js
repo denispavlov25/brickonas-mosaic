@@ -1063,7 +1063,7 @@ function drawStudCountForContext(
     // Use a minimum font size so the legend stays readable at high resolutions
     // (e.g. 288x288 mosaics where scalingFactor is small). The legend's geometry
     // is then driven by `effectiveScale`, decoupling it from the picture grid.
-    const MIN_LEGEND_FONT = 20;
+    const MIN_LEGEND_FONT = 26;
     const countFontSize = Math.max(scalingFactor / 2, MIN_LEGEND_FONT);
     const nameFontSize = Math.max(scalingFactor / 2.5, MIN_LEGEND_FONT * 0.85);
     const effectiveScale = Math.max(scalingFactor, MIN_LEGEND_FONT * 2);
@@ -1571,7 +1571,7 @@ function generateInstructionPage(
     // for the readable legend at high resolutions (small scalingFactor).
     // Use legendScale (not scalingFactor) so detail pages don't blow up the legend.
     // Keep this in sync with MIN_LEGEND_FONT in drawStudCountForContext.
-    const PAGE_MIN_LEGEND_FONT = 20;
+    const PAGE_MIN_LEGEND_FONT = 26;
     const pageLegendScale = Math.max(legendScale, PAGE_MIN_LEGEND_FONT * 2);
     const pageLegendRowHeight = pageLegendScale * 1.3;
     const pageLegendHeight =
@@ -1584,9 +1584,10 @@ function generateInstructionPage(
         pictureHeight * 0.4 + visibleStudHexList.length * radius * 2.5,
         pageLegendHeight + scalingFactor * 2
     );
-    // Detail pages need a wider right gutter for a properly sized overview thumbnail.
-    // Plate pages keep the original 2× layout.
-    canvas.width = overviewContext ? pictureWidth * 2.15 : pictureWidth * 2;
+    // Same canvas width on every page so the legend renders at the same
+    // absolute size in the final PDF (changing the canvas width changes
+    // the PDF scaling factor and visually rescales everything on the page).
+    canvas.width = pictureWidth * 2;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1669,11 +1670,12 @@ function generateInstructionPage(
 
     // Mini overview of the full plate, with the current block highlighted.
     // Helps the customer see where this 16×16 detail belongs in the plate.
-    // Placed in the (expanded) right gutter, sized to fill most of it.
+    // Sized to fit the standard right gutter (canvas.width = pictureWidth × 2,
+    // picture ends at 1.75 × pictureWidth → ~0.25 × pictureWidth available).
     if (overviewContext) {
         const gutterX = pictureWidth * 1.75 + legendScale * 0.6;
         const availW = canvas.width - gutterX - legendScale * 0.4;
-        const thumbSize = Math.min(availW, pictureHeight * 0.95);
+        const thumbSize = Math.min(availW, pictureHeight * 0.45);
         drawPlateOverviewThumbnail(ctx, overviewContext, pixelType, legendScale, {
             x: gutterX,
             y: pictureHeight * 0.2,
