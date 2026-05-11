@@ -265,6 +265,7 @@ const translations = {
         pdfLevel: "Ebene",
         pdfColor: "Farbe",
         pdfNoDepthOffset: "Kein Tiefenversatz im Abschnitt",
+        pdfOverviewLabel: "Übersicht",
 
         // Tips section (3D Preview)
         tips: "Tipps",

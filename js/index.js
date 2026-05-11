@@ -2632,7 +2632,11 @@ async function _generateBlobFromStep4() {
                         blockRow: br,
                         blockSize: BLOCK_SIZE,
                     };
-                    await helper(pdf, blockArray, BLOCK_SIZE, filteredAvailableStudHexList, PRINT_SCALING,
+                    // Scale up so the detail canvas matches the plate canvas size
+                    // (otherwise jsPDF stretches the smaller canvas across the same
+                    // page and the studs end up looking 3× too big).
+                    const detailScaling = PRINT_SCALING * (PLATE_WIDTH / BLOCK_SIZE);
+                    await helper(pdf, blockArray, BLOCK_SIZE, filteredAvailableStudHexList, detailScaling,
                         blockLabel, selectedPixelPartNumber, blockVariableDims,
                         pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES, overviewContext);
                 }
@@ -2775,13 +2779,13 @@ async function generateInstructions() {
         // Render one page (plate overview or 16x16 detail) into the current pdf.
         // overviewContext (optional): { fullPlateArray, plateWidth, blockCol, blockRow, blockSize }
         // triggers a small thumbnail with the current block highlighted.
-        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims, overviewContext) => {
+        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims, overviewContext, scalingOverride) => {
             const instructionPageCanvas = document.createElement("canvas");
             generateInstructionPage(
                 pixelArrayForPage,
                 plateWidthForPage,
                 filteredAvailableStudHexList,
-                SCALING_FACTOR,
+                scalingOverride || SCALING_FACTOR,
                 instructionPageCanvas,
                 label,
                 selectedPixelPartNumber,
@@ -2847,6 +2851,8 @@ async function generateInstructions() {
                             width: BLOCK_SIZE,
                             label: `${i + 1}.${blockIdx}`,
                             variableDims: blockVariableDims,
+                            // Match plate canvas size: detail block × 3 ≈ plate × 1 (at 48/16)
+                            scalingOverride: SCALING_FACTOR * (PLATE_WIDTH / BLOCK_SIZE),
                             overviewContext: {
                                 fullPlateArray: subPixelArray,
                                 plateWidth: PLATE_WIDTH,
@@ -2880,7 +2886,7 @@ async function generateInstructions() {
             document.getElementById("pdf-progress-bar").style.width = `${((p + 2) * 100) / (pageJobs.length + 1)}%`;
 
             const job = pageJobs[p];
-            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims, job.overviewContext);
+            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims, job.overviewContext, job.scalingOverride);
         }
 
         addWaterMark(pdf, isHighQuality);

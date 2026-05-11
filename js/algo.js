@@ -1660,11 +1660,12 @@ function generateInstructionPage(
 
     // Mini overview of the full plate, with the current block highlighted.
     // Helps the customer see where this 16×16 detail belongs in the plate.
-    // Placed to the right of the main picture, in the 0.25*pictureWidth gutter.
+    // Placed to the right of the main picture, in the right gutter.
     if (overviewContext) {
-        const gutterX = pictureWidth * 1.75 + scalingFactor * 0.6;
-        const availW = canvas.width - gutterX - scalingFactor * 0.5;
-        const thumbSize = Math.max(120, Math.min(availW, pictureHeight * 0.45));
+        const gutterX = pictureWidth * 1.75 + scalingFactor * 0.4;
+        const availW = canvas.width - gutterX - scalingFactor * 0.4;
+        // Larger thumbnail than before — fills most of the right gutter.
+        const thumbSize = Math.max(200, Math.min(availW, pictureHeight * 0.8));
         drawPlateOverviewThumbnail(ctx, overviewContext, pixelType, {
             x: gutterX,
             y: pictureHeight * 0.2,
