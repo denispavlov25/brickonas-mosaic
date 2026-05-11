@@ -1055,7 +1055,8 @@ function drawStudCountForContext(
     ctx,
     horizontalOffset,
     verticalOffset,
-    pixelType
+    pixelType,
+    studToNumberOverride
 ) {
     const isVariable = ("" + pixelType).match("^variable.*$");
 
@@ -1160,7 +1161,7 @@ function drawStudCountForContext(
 
     // Rows: swatch + (count) + name
     availableStudHexList.forEach((pixelHex, i) => {
-        const number = i + 1;
+        const number = studToNumberOverride ? studToNumberOverride[pixelHex] : i + 1;
         const rowCenterY = boxTop + topPadding + i * rowHeight + rowHeight / 2;
         const swatchCx = boxLeft + leftPadding + radius;
         drawPixel(
@@ -1543,7 +1544,8 @@ function generateInstructionPage(
     canvas,
     plateNumber,
     pixelType,
-    variablePixelPieceDimensions
+    variablePixelPieceDimensions,
+    overviewContext
 ) {
     const ctx = canvas.getContext("2d");
 
@@ -1555,6 +1557,11 @@ function generateInstructionPage(
 
     const studMap = getUsedPixelsStudMap(pixelArray);
 
+    // Only show colors that actually appear on this page in the legend.
+    // The global stud→number mapping is preserved so a color keeps the same
+    // number across all pages of the PDF.
+    const visibleStudHexList = availableStudHexList.filter((hex) => (studMap[hex] || 0) > 0);
+
     // Match the legend's minimum-size logic so the canvas reserves enough room
     // for the readable legend at high resolutions (small scalingFactor).
     const PAGE_MIN_LEGEND_FONT = 26;
@@ -1563,11 +1570,11 @@ function generateInstructionPage(
     const pageLegendHeight =
         PAGE_MIN_LEGEND_FONT * 1.05 * 1.8 +
         pageLegendScale * 0.4 +
-        pageLegendRowHeight * availableStudHexList.length +
+        pageLegendRowHeight * visibleStudHexList.length +
         pageLegendScale * 0.6;
     canvas.height = Math.max(
         pictureHeight * 1.5,
-        pictureHeight * 0.4 + availableStudHexList.length * radius * 2.5,
+        pictureHeight * 0.4 + visibleStudHexList.length * radius * 2.5,
         pageLegendHeight + scalingFactor * 2
     );
     canvas.width = pictureWidth * 2;
@@ -1651,14 +1658,72 @@ function generateInstructionPage(
         }
     }
 
+    // Mini overview of the full plate, with the current block highlighted.
+    // Helps the customer see where this 16×16 detail belongs in the plate.
+    // Placed to the right of the main picture, in the 0.25*pictureWidth gutter.
+    if (overviewContext) {
+        const gutterX = pictureWidth * 1.75 + scalingFactor * 0.6;
+        const availW = canvas.width - gutterX - scalingFactor * 0.5;
+        const thumbSize = Math.max(120, Math.min(availW, pictureHeight * 0.45));
+        drawPlateOverviewThumbnail(ctx, overviewContext, pixelType, {
+            x: gutterX,
+            y: pictureHeight * 0.2,
+            size: thumbSize,
+        });
+    }
+
     drawStudCountForContext(
         studMap,
-        availableStudHexList,
+        visibleStudHexList,
         scalingFactor,
         ctx,
         pictureWidth * 0.25,
         pictureHeight * 0.2 - radius,
-        pixelType
+        pixelType,
+        studToNumber
+    );
+}
+
+// Draws a small thumbnail of the full plate with the current sub-block
+// outlined in green. The plate's pixels are rendered as flat colored squares
+// (no stud rendering, no numbers) — the goal is "where am I", not legibility.
+function drawPlateOverviewThumbnail(ctx, overview, pixelType, layout) {
+    const { fullPlateArray, plateWidth, blockCol, blockRow, blockSize } = overview;
+    const { x, y, size } = layout;
+
+    const cell = size / plateWidth;
+
+    // Title above the thumbnail
+    const titleFont = Math.max(14, size * 0.04);
+    ctx.fillStyle = "#202020";
+    ctx.font = `bold ${titleFont}px Arial`;
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(t('pdfOverviewLabel') || "Übersicht", x, y - titleFont * 0.6);
+
+    // Pixel grid
+    for (let i = 0; i < plateWidth; i++) {
+        for (let j = 0; j < plateWidth; j++) {
+            const idx = (i * plateWidth + j) * 4;
+            const hex = rgbToHex(fullPlateArray[idx], fullPlateArray[idx + 1], fullPlateArray[idx + 2]);
+            ctx.fillStyle = hex;
+            ctx.fillRect(x + j * cell, y + i * cell, cell + 0.5, cell + 0.5);
+        }
+    }
+
+    // Outer border
+    ctx.strokeStyle = "#202020";
+    ctx.lineWidth = Math.max(2, size * 0.006);
+    ctx.strokeRect(x, y, size, size);
+
+    // Highlight current block
+    ctx.strokeStyle = "#1B5E20";
+    ctx.lineWidth = Math.max(4, size * 0.018);
+    ctx.strokeRect(
+        x + blockCol * blockSize * cell,
+        y + blockRow * blockSize * cell,
+        blockSize * cell,
+        blockSize * cell
     );
 }
 

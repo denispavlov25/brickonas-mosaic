@@ -2625,9 +2625,16 @@ async function _generateBlobFromStep4() {
                         ? null
                         : getSubPixelMatrix(variablePixelPieceDimensionsForPage, bc * BLOCK_SIZE, br * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
                     const blockLabel = `${i + 1}.${blockIdx}`;
+                    const overviewContext = {
+                        fullPlateArray: subPixelArray,
+                        plateWidth: PLATE_WIDTH,
+                        blockCol: bc,
+                        blockRow: br,
+                        blockSize: BLOCK_SIZE,
+                    };
                     await helper(pdf, blockArray, BLOCK_SIZE, filteredAvailableStudHexList, PRINT_SCALING,
                         blockLabel, selectedPixelPartNumber, blockVariableDims,
-                        pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES);
+                        pdfWidth, pdfHeight, isHighQuality, JPEG_QUALITY_PAGES, overviewContext);
                 }
             }
         }
@@ -2639,10 +2646,10 @@ async function _generateBlobFromStep4() {
 // Render one instruction page (plate overview or detail block) into the PDF.
 async function drawPdfInstructionPage(pdf, pixelArray, plateWidth, availableStudHexList, scaling,
                                        label, pixelType, variableDims,
-                                       pdfWidth, pdfHeight, isHighQuality, jpegQuality) {
+                                       pdfWidth, pdfHeight, isHighQuality, jpegQuality, overviewContext) {
     const canvas = document.createElement("canvas");
     generateInstructionPage(pixelArray, plateWidth, availableStudHexList, scaling,
-        canvas, label, pixelType, variableDims);
+        canvas, label, pixelType, variableDims, overviewContext);
     setDPI(canvas, isHighQuality ? HIGH_DPI : LOW_DPI);
     const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
     const ratio = canvas.width / canvas.height;
@@ -2732,7 +2739,16 @@ async function generateInstructions() {
             );
             setDPI(titlePageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
 
-        const imgData = titlePageCanvas.toDataURL("image/png", 1.0);
+        // JPEG instead of PNG: cuts PDF size ~20× for instruction pages.
+        // Quality tuned to match the customer-order path (_generateBlobFromStep4).
+        const totalNoppen = targetResolution[0] * targetResolution[1];
+        const JPEG_QUALITY_PAGES = totalNoppen <= 96 * 96 ? 0.96
+                                 : totalNoppen <= 192 * 192 ? 0.92
+                                 : 0.88;
+        const JPEG_QUALITY_TITLE = totalNoppen <= 96 * 96 ? 0.97
+                                 : totalNoppen <= 192 * 192 ? 0.95
+                                 : 0.93;
+        const imgData = titlePageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_TITLE);
 
         let pdf = new jsPDF({
             orientation: titlePageCanvas.width < titlePageCanvas.height ? "p" : "l",
@@ -2751,14 +2767,15 @@ async function generateInstructions() {
         document.getElementById("pdf-progress-container").hidden = false;
         document.getElementById("download-instructions-button").hidden = true;
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
-        
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, (pdfWidth * titlePageCanvas.height) / titlePageCanvas.width);
+
         // Remove title page canvas from DOM to free memory
         titlePageCanvas.remove();
 
         // Render one page (plate overview or 16x16 detail) into the current pdf.
-        // Returns nothing; mutates pdf via addImage.
-        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims) => {
+        // overviewContext (optional): { fullPlateArray, plateWidth, blockCol, blockRow, blockSize }
+        // triggers a small thumbnail with the current block highlighted.
+        const renderPageToPdf = (pixelArrayForPage, plateWidthForPage, label, variableDims, overviewContext) => {
             const instructionPageCanvas = document.createElement("canvas");
             generateInstructionPage(
                 pixelArrayForPage,
@@ -2768,13 +2785,14 @@ async function generateInstructions() {
                 instructionPageCanvas,
                 label,
                 selectedPixelPartNumber,
-                variableDims
+                variableDims,
+                overviewContext
             );
             setDPI(instructionPageCanvas, isHighQuality ? HIGH_DPI : LOW_DPI);
-            const pageImgData = instructionPageCanvas.toDataURL("image/png", 1.0);
+            const pageImgData = instructionPageCanvas.toDataURL("image/jpeg", JPEG_QUALITY_PAGES);
             pdf.addImage(
                 pageImgData,
-                "PNG",
+                "JPEG",
                 0,
                 0,
                 pdfWidth,
@@ -2829,6 +2847,13 @@ async function generateInstructions() {
                             width: BLOCK_SIZE,
                             label: `${i + 1}.${blockIdx}`,
                             variableDims: blockVariableDims,
+                            overviewContext: {
+                                fullPlateArray: subPixelArray,
+                                plateWidth: PLATE_WIDTH,
+                                blockCol: bc,
+                                blockRow: br,
+                                blockSize: BLOCK_SIZE,
+                            },
                         });
                     }
                 }
@@ -2855,7 +2880,7 @@ async function generateInstructions() {
             document.getElementById("pdf-progress-bar").style.width = `${((p + 2) * 100) / (pageJobs.length + 1)}%`;
 
             const job = pageJobs[p];
-            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims);
+            renderPageToPdf(job.pixels, job.width, job.label, job.variableDims, job.overviewContext);
         }
 
         addWaterMark(pdf, isHighQuality);
