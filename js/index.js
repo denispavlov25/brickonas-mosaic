@@ -3626,11 +3626,6 @@ if (orderMosaicBtn) {
             btn.disabled = true;
             btn.classList.add('bk-adding');
 
-            // Send email notification with mosaic details
-            try { sendMosaicOrderEmail(statusEl); } catch(emailErr) {
-                console.error('[BRICKONAS] Email error:', emailErr);
-            }
-
             // If uploader is enabled, generate PDF + upload (with progress status)
             var mosaicToken = null;
             var uploadFailed = false;
